@@ -56,7 +56,12 @@ async def change_upstream(request):
         ok_html = "<html>执行{}动作成功<a href='/nginx'>返回</a></html>".format(action)
         return web.Response(status=200, charset="utf8", text=ok_html, content_type='text/html')
     elif request.method == "GET":
-        return {'domains': DOMAINS}
+        domains = list()
+        for domain in DOMAINS:
+            _servers = await config.get_domain_config(domain, "backends")
+            if _servers:
+                domains.append(domain)
+        return {'domains': domains}
     else:
         return web.Response(status=401)
 

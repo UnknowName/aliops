@@ -26,6 +26,8 @@ async def slb_index(request):
         for domain in DOMAINS:
             domain_addr = socket.getaddrinfo(domain, None)[0][4][0]
             domain_slbs = await config.get_domain_config(domain, 'slbs')
+            if not domain_slbs:
+                continue
             req.set_accept_format('json')
             current_slbs = list()
             # 检查SLB的IP地址与当前解析IP一致，不一致不返回。过滤掉备用的SLB
