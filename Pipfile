@@ -1,0 +1,20 @@
+[[source]]
+name = "pypi"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+aiohttp = "*"
+aiohttp-jinja2 = "*"
+jinja2 = "*"
+pyyaml = "*"
+aliyun-python-sdk-slb = "*"
+aliyun-python-sdk-ecs = "*"
+aliyunsdkcore = "*"
+aliyun-python-sdk-core-v3 = "*"
+aliyun-python-sdk-alidns = "*"
+
+[requires]
+python_version = "3.7"

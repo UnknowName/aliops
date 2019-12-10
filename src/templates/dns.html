@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DNS快速修改</title>
+    <style>
+        body { font-size: 60px}
+        #notice { color:red; margin: 50px 60px }
+        li {list-style: none; font-size:60px}
+        #ip {margin: -2px auto; color: green}
+        .ip {margin: -2px auto; color: green}
+        .ip-item { font-size:60px}
+        input  { height:60px;width:70px;}
+        button { height:70px;width:70px; margin: -8px auto}
+        #info { margin: -8px auto }
+    </style>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+</head>
+<body>
+<h6 id="notice">注意: 修改后成功后请刷新下页面，以防更新IP未更新</h6>
+<ul>
+{% for domain in domains %}
+    <li><input type="radio" name="domain" value="{{ domain }}"/>{{ domain }}</li>
+{% endfor %}
+    <p id="ip"></p>
+</ul>
+</body>
+<script>
+//选择域名后触发AJAX请求事件
+$("input:radio[name='domain']").change(function() {
+    var domain = this.value;
+    GetDomainIp(domain);
+});
+
+//通过AJAX请求，获取当前域名解析的IP信息
+function GetDomainIp(domain) {
+    $.ajax({
+      type: "POST",
+      url: "/dns/get_ip",
+      dataType: "json",
+      data: {
+          domain: domain,
+      }
+    }).always(function(data) {
+        var ipDiv = $('#ip');
+         if (JSON.stringify(data) == "{}") {
+            alert("API帐号下未发现有此域名记录，请联系管理员查实！");
+            window.location.reload();
+            return;
+        }
+        var records = data.DomainRecords.Record;
+        for(var i = 0;i < records.length; i++) {
+            var recordLine = records[i].Line;
+            var recordType = records[i].Type;
+            var record = records[i].RR;
+            var domainName = records[i].DomainName;
+            var full_domain = `${record}.${domainName}`;
+            /*保证一定是A记录，后端强制只能修改A记录*/
+            if ( recordLine == 'default' && recordType == 'A' && full_domain == domain) {
+                var recordIP = records[i].Value;
+                var recordID = records[i].RecordId;
+                var backupIps = data.BackupIPs;
+                ipDiv.html("");
+                ipDiv.append(`<p id="info">当前域名的默认线路解析IP为:${recordIP},&nbsp;可用IP为:</p>`);
+                for (var i=0;i<backupIps.length;i++) {
+                    /*
+                    if (backupIps[i] == recordIP) {
+                        continue;
+                     };
+                     */
+                     var html = `
+                     <p>
+                        ${backupIps[i]}
+                        <button onclick=ChangeDNS("${domain}","${backupIps[i]}","${recordID}")>快速修改</button>
+                     </p>
+                    `;
+                    ipDiv.append(html);
+                };
+                break;
+            };
+        };
+    });
+};
+
+//点击快速修改后的动作函数
+function ChangeDNS(domain, ip, id) {
+    //console.log(domain, ip, id);
+    $.ajax({
+      type: "GET",
+      url: `/dns/change?domain=${domain}&ip=${ip}&id=${id}`,
+      dataType: "json",
+    }).always(function (response) {
+        console.log(response.msg);
+        if (response.msg == 'OK') {
+            var infoDiv = $('#info');
+            infoDiv.html("");
+            infoDiv.append(`<p id="info">当前域名的默认线路解析IP为:${ip},&nbsp;备用IP为:</p>`);
+            alert(`成功将域名${domain}的A记录修改为${ip}`);
+        }else {
+            alert('修改A记录失败，请重试或者联系管理员!');
+        };
+    });
+};
+</script>
+</html>

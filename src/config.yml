@@ -1,0 +1,47 @@
+domains:
+  - dev.siss.io:
+      # for change dns record
+      domain: siss.io
+      # for nginx
+      config_file: /etc/nginx/conf.d/dev.siss.io.conf
+      slbs:
+        - lb-wz9d9j05rzlyok300fcf4
+        - lb-wz9obyqmiidllwulomjxh
+      backends:
+        - 128.0.255.6:81
+        - 128.0.255.7:81
+      ips:
+        - 120.77.199.116
+        - 47.107.24.104
+
+  - www.unknowname.win:
+      # for change dns record
+      domain: unknowname.win
+      # for nginx
+      config_file: /etc/nginx/conf.d/www.unknowname.win.conf
+      slbs:
+        - lb-wz9d9j05rzlyok300fcf4 #Jumpserver
+        - lb-wz9obyqmiidllwulomjxh #test
+      backends:
+        - 128.0.255.27:80
+        - 128.0.255.28:80
+      ips:
+        - 47.107.24.104
+        - 47.107.17.249
+        - 120.77.111.55
+
+nginx:
+  ssh_user: username
+  hosts:
+    - 128.0.255.2
+    - 128.0.255.3
+
+api:
+  aeskey: LTAIuHrbxKLdhIrH
+  aeskey_secret: ExDxVL5bkHl9kMWGg5pnHi3RcHjVZd
+  region: cn-shenzhen
+
+dns_api:
+  aeskey: aaa
+  aeskey_secret: bbb
+  region: cn-shenzhen

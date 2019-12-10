@@ -1,0 +1,67 @@
+<html>
+  <head>
+    <style type="text/css">
+      li { list-style:none}
+      html { font-size: 60px}
+      form { margin: 100px 50px;}
+      input { height:50px;width:50px;}
+    </style>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+  </head>
+  <body>
+<form name="nginx" method="post" action="/nginx" onsubmit="return checkData()" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
+  <p>
+  请选择要操作的域名:
+  {% for domain in domains %}
+    <li><input name="domain"  type="radio" value="{{ domain }}"/>{{ domain }}</li>
+  {% endfor %}
+  </p>
+  <p id="servers">
+  </p>
+  操作类型:
+  <input type="radio" name="action" checked value="up">上线</input>
+  <input type="radio" name="action" value="down">下线</input>
+  <p><input type="submit" style="width:150px;height:100px" value="修改"/></p>
+</form>
+</body>
+<script>
+function get_backends(domain) {
+    $.ajax({
+      type: "POST",
+      url: "/domain/backends",
+      dataType: "json",
+      data: {
+          domain: domain,
+      }
+    }).always(function (data) {
+        //console.log(data.servers);
+        var p = $("#servers");
+        var li = $(".server");
+        var h = $("#notice");
+        li.remove();
+        h.remove();
+        p.append("<h7 id='notice'>可用服务器列表:</h7>");
+        for (i=0; i< data.servers.length; i++) {
+            var server = data.servers[i]
+            p.append(`<li class='server'><input name='servers' type='checkbox' value=${server}></input>${server}</li>`);
+        };
+    });
+};
+
+$("input:radio[name='domain']").change(function() {
+    var domain = this.value;
+    get_backends(domain);
+    //console.log("servers is", servers);
+});
+
+function checkData(){
+  var data=$("input:checkbox[name=servers]:checked").val();
+  if (typeof(data) == "undefined") {
+      alert("请至少选择一台服务器进行操作!");
+      return false;
+  };
+  return true;
+};
+</script>
+</html>

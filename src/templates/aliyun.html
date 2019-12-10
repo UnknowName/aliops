@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style type="text/css">
+      li {list-style:none; color:green}
+      html { font-size: 70px}
+      input  { height:60px;width:60px;}
+      button { height:70px;width:70px;}
+      .item { color: #7700BB}
+      p { margin: -5px auto }
+    </style>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <title>Aliyun SLb</title>
+</head>
+<body>
+    <h6 id="warn">下线前请确认相关服务器信息再执行上下线操作，以防操作错误！</h6>
+    {% for dic in domains %}
+        {% for domain, slbs in  dic.items() %}
+            <p>{{ domain }}</p>
+            <ul>
+                {% for slb in slbs %}
+                <li><input type="radio" name="slb" value="{{ slb }}"/>{{ slb }}</li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+    {% endfor %}
+    <p id="slb"></p>
+    <p id="ecs"></p>
+</body>
+<script>
+//选择SLB后触发AJAX请求事件
+$("input:radio[name='slb']").change(function() {
+    var slb_id = this.value;
+    getSlbInfo(slb_id);
+});
+
+//获取SLB详细信息
+function getSlbInfo(slb_id) {
+    $.ajax({
+      type: "POST",
+      url: "/slb/info",
+      dataType: "json",
+      data: {
+          slb_id: slb_id,
+      }
+    }).always(function (data) {
+      var slb = $("#slb");
+      var server = $(".server");
+      var item = $(".item");
+      server.remove();
+      item.remove();
+      slb.append("<h7 class='server'>SLB详情:</h7>");
+      slb.append("<p class='server'>IP: " + data.ip + "</p>");
+      slb.append("<p class='server'>名称: " + data.name + "</p>");
+      var backendServers = data.servers;
+      if (backendServers.length > 0) {
+        slb.append("<p class='server'>默认后端服务器:</p>");
+        for (var i=0;i < backendServers.length;i++) {
+          var serverId = backendServers[i].id;
+          var serverName = backendServers[i].name;
+          var serverInnerIP = backendServers[i].private_ip;
+          var serverPublicIP = backendServers[i].public_ip;
+          var html = `
+            <li class="server">
+              <p>ECS名称 ${serverName}</p>
+              <p>ECS内网IP ${serverInnerIP}</p>
+              <p>ECS外网IP ${serverPublicIP}</p>
+              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'offline')">下线</button>
+              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'online')">上线</button>
+            </li>
+          `;
+          slb.append(html);
+        };
+      };
+    });
+};
+
+//对指定SLB的指定ECS执行上下线操作（将权重设置为0/100）
+//action为online/offline两种选项
+function changeServerStatus(ecsId, slbId, action) {
+    $.ajax({
+      type: "GET",
+      url: `/slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}`,
+      dataType: "json",
+    }).always(function (response) {
+        if (response.status == undefined) {
+            var server = response.BackendServers.BackendServer[0];
+            alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
+        } else {
+            alert("设置失败，请重试或者联系管理员");
+        };
+    });
+};
+</script>
+</html>

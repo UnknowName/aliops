@@ -1,0 +1,158 @@
+import json
+import socket
+
+import aiohttp_jinja2
+from aiohttp import web
+
+from aliyunsdkcore.client import AcsClient
+from aliyunsdkslb.request.v20140515.SetBackendServersRequest import SetBackendServersRequest
+from aliyunsdkecs.request.v20140526.DescribeInstancesRequest import DescribeInstancesRequest
+from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
+from aliyunsdkalidns.request.v20150109.UpdateDomainRecordRequest import UpdateDomainRecordRequest
+from aliyunsdkalidns.request.v20150109.DescribeDomainRecordsRequest import DescribeDomainRecordsRequest
+
+import config
+
+DOMAINS = config.DOMAINS
+dns_client = client = AcsClient(config.AESKEY, config.AESKEY_SECRET, config.REGION)
+# dns_client = AcsClient(config.DNS_AESKEY, config.DNS_SECRET, config.DNS_REGION)
+
+
+@aiohttp_jinja2.template("aliyun.html")
+async def slb_index(request):
+    if request.method == "GET":
+        req = DescribeLoadBalancerAttributeRequest()
+        responses = list()
+        for domain in DOMAINS:
+            domain_addr = socket.getaddrinfo(domain, None)[0][4][0]
+            domain_slbs = await config.get_domain_config(domain, 'slbs')
+            req.set_accept_format('json')
+            current_slbs = list()
+            # 检查SLB的IP地址与当前解析IP一致，不一致不返回。过滤掉备用的SLB
+            for slb in domain_slbs:
+                req.set_LoadBalancerId(slb)
+                req_resp = json.loads(client.do_action_with_exception(req).decode("utf8"))
+                slb_addr = req_resp.get("Address", "")
+                if domain_addr == slb_addr:
+                    current_slbs.append(slb)
+            resp = {domain: current_slbs}
+            responses.append(resp)
+        return dict(domains=responses)
+
+
+async def get_slb_backends(request):
+    if request.method == "POST":
+        data = await request.post()
+        req = DescribeLoadBalancerAttributeRequest()
+        req.set_accept_format('json')
+        req.set_LoadBalancerId(data.get("slb_id", ""))
+        response = json.loads(client.do_action_with_exception(req).decode("utf8"))
+        resp = dict()
+        resp["name"] = response.get("LoadBalancerName")
+        resp["ip"] = response.get("Address")
+        servers = response.get("BackendServers").get("BackendServer")
+        # 先获取SLB默认后端的ECS的ID，SLB只提供该API
+        ecs_ids = [server.get("ServerId") for server in servers]
+        # 拿到ECS ID后，再获取该ECS详细信息，最终返回给页面渲染
+        req = DescribeInstancesRequest()
+        req.set_accept_format('json')
+        req.set_PageSize(50)
+        req.set_InstanceIds(ecs_ids)
+        _response = json.loads(client.do_action_with_exception(req).decode("utf8"))
+        instances = _response.get("Instances").get("Instance")
+        _results = []
+        for instance in instances:
+            item = dict()
+            item["name"] = instance.get("InstanceName")
+            item["id"] = instance.get("InstanceId")
+            if instance.get("InstanceNetworkType") == "classic":
+                item['private_ip'] = instance.get("InnerIpAddress").get("IpAddress")[0]
+            else:
+                item['private_ip'] = instance.get("NetworkInterfaces").get("NetworkInterface")[0].get(
+                    "PrimaryIpAddress")
+            item['public_ip'] = instance.get("PublicIpAddress").get("IpAddress")[0]
+            _results.append(item)
+        resp["servers"] = _results
+        return web.json_response(resp)
+    elif request == "GET":
+        return web.Response(status=405)
+
+
+async def change_slb_backend(request):
+    ecs_id = request.query.get("ecsId")
+    slb_id = request.query.get("slbId")
+    action = request.query.get("action")
+    if action == "online":
+        weight = 100
+    elif action == "offline":
+        weight = 0
+    else:
+        return web.Response(status=500, text="error")
+    req = SetBackendServersRequest()
+    req.set_accept_format('json')
+    req.set_LoadBalancerId(slb_id)
+    data = dict(ServerId=ecs_id, weight=weight)
+    req.set_BackendServers([data])
+    try:
+        response = client.do_action_with_exception(req)
+        print("对SLB{}服务器{}执行{}操作".format(slb_id, ecs_id, action))
+        return web.Response(status=200, text=response.decode("utf8"))
+    except Exception as e:
+        print(e)
+        return web.Response(status=500, text="error")
+
+
+@aiohttp_jinja2.template("dns.html")
+async def dns_index(request):
+    if request.method == 'GET':
+        return {'domains': config.DOMAINS}
+
+
+async def dns_get_ip(request):
+    if request.method == 'POST':
+        data = await request.post()
+        full_domain = data.get("domain")
+        domain = await config.get_domain_config(full_domain, 'domain')
+        # 通过索引切片，获取最前面的RR值。如www.unknowname.win取值www
+        full_len = len(full_domain)
+        domain_len = len(domain) + 1
+        query_keyword = full_domain[:full_len - domain_len]
+        request = DescribeDomainRecordsRequest()
+        request.set_accept_format('json')
+        request.set_DomainName(domain)
+        request.set_Lang("en")
+        request.set_PageSize(20)
+        request.set_KeyWord(query_keyword)
+        try:
+            response = dns_client.do_action_with_exception(request)
+            resp = str(response, encoding='utf-8')
+            detail = json.loads(resp)
+            backup_ips = await config.get_domain_config(full_domain, 'ips')
+            detail["BackupIPs"] = backup_ips
+            return web.json_response(detail)
+        except Exception as e:
+            print(e)
+        return web.json_response({})
+
+
+async def dns_change_ip(request):
+    domain = request.query.get("domain")
+    ip = request.query.get("ip")
+    ips = await config.get_domain_config(domain, 'ips')
+    if ip not in ips:
+        resp = dict(msg="非法IP!修改只限已给定列表中的IP")
+        return web.json_response(resp)
+    record_id = request.query.get("id")
+    domain_record, *_ = domain.split(".")
+    request = UpdateDomainRecordRequest()
+    request.set_accept_format('json')
+    request.set_RecordId(record_id)
+    request.set_RR(domain_record)
+    request.set_Type("A")
+    request.set_Value(ip)
+    response = dns_client.do_action_with_exception(request)
+    if json.loads(response.decode("utf8")).get("RecordId") == record_id:
+        resp = dict(msg="OK")
+        return web.json_response(resp)
+    err_resp = dict(msg="error")
+    return web.json_response(err_resp)
