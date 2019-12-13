@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
   </head>
   <body>
-<form name="nginx" method="post" action="/nginx" onsubmit="return checkData()" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
+<form name="nginx" method="post" action="nginx" onsubmit="return checkData()" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
   <p>
   请选择要操作的域名:
   {% for domain in domains %}
@@ -29,7 +29,7 @@
 function get_backends(domain) {
     $.ajax({
       type: "POST",
-      url: "/domain/backends",
+      url: "domain/backends",
       dataType: "json",
       data: {
           domain: domain,

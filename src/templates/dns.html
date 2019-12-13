@@ -36,7 +36,7 @@ $("input:radio[name='domain']").change(function() {
 function GetDomainIp(domain) {
     $.ajax({
       type: "POST",
-      url: "/dns/get_ip",
+      url: "dns/get_ip",
       dataType: "json",
       data: {
           domain: domain,
@@ -87,7 +87,7 @@ function ChangeDNS(domain, ip, id) {
     //console.log(domain, ip, id);
     $.ajax({
       type: "GET",
-      url: `/dns/change?domain=${domain}&ip=${ip}&id=${id}`,
+      url: `dns/change?domain=${domain}&ip=${ip}&id=${id}`,
       dataType: "json",
     }).always(function (response) {
         console.log(response.msg);

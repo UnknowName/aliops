@@ -39,7 +39,7 @@ $("input:radio[name='slb']").change(function() {
 function getSlbInfo(slb_id) {
     $.ajax({
       type: "POST",
-      url: "/slb/info",
+      url: "slb/info",
       dataType: "json",
       data: {
           slb_id: slb_id,
@@ -81,7 +81,7 @@ function getSlbInfo(slb_id) {
 function changeServerStatus(ecsId, slbId, action) {
     $.ajax({
       type: "GET",
-      url: `/slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}`,
+      url: `slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}`,
       dataType: "json",
     }).always(function (response) {
         if (response.status == undefined) {
