@@ -85,8 +85,13 @@ function changeServerStatus(ecsId, slbId, action) {
       dataType: "json",
     }).always(function (response) {
         if (response.status == undefined) {
-            var server = response.BackendServers.BackendServer[0];
-            alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
+            var servers = response.BackendServers.BackendServer;
+            for(var i=0;i<servers.length;i++) {
+                server = servers[i];
+                if (server.ServerId == ecsId) {
+                    alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
+                };
+            };
         } else {
             alert("设置失败，请重试或者联系管理员");
         };
