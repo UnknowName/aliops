@@ -39,7 +39,7 @@ async def change_upstream(request):
         if not all(results):
             return web.Response(
                 status=200,
-                text="<html>执行服务器上/下线失败,请联系管理员查找原因<a href='/nginx'>返回</a><html>",
+                text="<html>执行服务器上/下线失败,请联系管理员查找原因<a href='nginx'>返回</a><html>",
                 content_type="text/html"
             )
         # Reload NGINX
@@ -51,9 +51,9 @@ async def change_upstream(request):
         if not all([relod.result() for relod in relods]):
             return web.Response(
                 status=200, content_type='text/html',
-                text="<html>执行服务器上/下线失败，请联系管理员查找原因<a href='/nginx'>返回</a></html>",
+                text="<html>执行服务器上/下线失败，请联系管理员查找原因<a href='nginx'>返回</a></html>",
             )
-        ok_html = "<html>执行{}动作成功<a href='/nginx'>返回</a></html>".format(action)
+        ok_html = "<html>执行{}动作成功<a href='nginx'>返回</a></html>".format(action)
         return web.Response(status=200, charset="utf8", text=ok_html, content_type='text/html')
     elif request.method == "GET":
         domains = list()
