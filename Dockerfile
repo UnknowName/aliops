@@ -11,7 +11,8 @@ RUN adduser -D -u 120002 -h /opt/app app \
     && apk del libffi-dev tzdata gcc make linux-headers openssl-dev musl-dev\
     && rm -rf /var/cache/apk/*
 ADD id_rsa  /opt/app/.ssh/
-RUN chown -R app:app /opt/app
+RUN chmod 600 /opt/app/.ssh/* \
+    && chown -R app:app /opt/app
 USER app
 EXPOSE 8080
 CMD ["python", "-u", "aliops.py"]
