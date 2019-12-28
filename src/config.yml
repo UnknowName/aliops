@@ -37,8 +37,8 @@ nginx:
     - 128.0.255.3
 
 api:
-  aeskey: LTAIuHrbxKLdhIrH
-  aeskey_secret: ExDxVL5bkHl9kMWGg5pnHi3RcHjVZd
+  aeskey: keyid
+  aeskey_secret: key-secret
   region: cn-shenzhen
 
 dns_api:
