@@ -50,8 +50,8 @@ async def change_upstream(request):
             )
         # Reload NGINX
         reload_tasks = [
-            run_remote_cmd(user, nginx, "nginx -t&&nginx -s reload")
-            for nginx in NGINXS
+            run_remote_cmd(nginx_user, nginx, "nginx -t&&nginx -s reload")
+            for nginx in nginxs
         ]
         relods, _ = await asyncio.wait(reload_tasks, timeout=5)
         if not all([relod.result() for relod in relods]):
