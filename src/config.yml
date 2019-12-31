@@ -3,6 +3,11 @@ domains:
       # for change dns record
       domain: siss.io
       # for nginx
+      nginx:
+        ssh_user: username
+        hosts:
+          - 128.0.255.2
+          - 128.0.255.3
       config_file: /etc/nginx/conf.d/dev.siss.io.conf
       slbs:
         - lb-wz9d9j05rzlyok300fcf4
@@ -29,12 +34,12 @@ domains:
         - 47.107.24.104
         - 47.107.17.249
         - 120.77.111.55
-
+# Global NGINX.if domains section no nginx present,use here
 nginx:
   ssh_user: username
   hosts:
-    - 128.0.255.2
-    - 128.0.255.3
+    - 128.0.255.12
+    - 128.0.255.13
 
 api:
   aeskey: keyid

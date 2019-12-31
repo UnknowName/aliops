@@ -6,9 +6,9 @@ from aiohttp import web
 import config
 from utils import run_remote_cmd, gener_cmd
 
-NGINXS = config.NGINXS
+GLOBAL_NGINXS = config.NGINXS
 DOMAINS = config.DOMAINS
-NGINX_USER = config.NGINX_USER
+GLOBAL_NGINX_USER = config.NGINX_USER
 
 
 @aiohttp_jinja2.template("nginx.html")
@@ -28,10 +28,16 @@ async def change_upstream(request):
         if not cmds:
             return web.Response(text="请至少选择一台服务器进行操作!")
         # Set Server up/down
-        user = NGINX_USER
+        domain_ngx = await config.get_domain_config(domain, 'nginx')
+        if domain_ngx:
+            nginxs = domain_ngx.get("hosts")
+            nginx_user = domain_ngx.get("ssh_user")
+        else:
+            nginxs = GLOBAL_NGINXS
+            nginx_user = GLOBAL_NGINX_USER
         tasks = [
-            run_remote_cmd(user, nginx, cmd)
-            for nginx in NGINXS
+            run_remote_cmd(nginx_user, nginx, cmd)
+            for nginx in nginxs
             for cmd in cmds
         ]
         dones, _ = await asyncio.wait(tasks, timeout=5)

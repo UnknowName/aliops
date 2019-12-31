@@ -52,3 +52,6 @@ DNS_REGION = _get_attr("dns_api").get("region")
 
 if __name__ == '__main__':
     print(AESKEY, AESKEY_SECRET)
+    import asyncio
+    nginx = get_domain_config("dev.siss.io", "nginx")
+    print(asyncio.run(nginx))
