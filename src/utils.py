@@ -12,7 +12,7 @@ async def run_remote_cmd(user: str, host: str, raw_cmd: str) -> bool:
 
 
 def gener_cmd(types: str, host: str, config_file: str) -> str:
-    cmd_fmt = r'sed -ri "s/{types}(\s+?server\s+?{host}.*)/{flag}\1/g" {filename}'
+    cmd_fmt = r'sed -ri "s/{types}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
     if types == "up":
         raw_cmd = cmd_fmt.format(types="#+", host=host, filename=config_file, flag="")
     elif types == "down":

@@ -29,7 +29,7 @@ async def change_upstream(request):
             return web.Response(text="请至少选择一台服务器进行操作!")
         # Set Server up/down
         domain_ngx = await config.get_domain_config(domain, 'nginx')
-        if domain_ngx:
+        if isinstance(domain_ngx, dict) and domain_ngx:
             nginxs = domain_ngx.get("hosts")
             nginx_user = domain_ngx.get("ssh_user")
         else:
