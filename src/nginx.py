@@ -72,17 +72,15 @@ async def change_upstream(request):
     else:
         return web.Response(status=401)
 
-
 """
 async def get_domain_attrs(request):
     data = await request.post()
     domain = data.get("domain")
     attr = request.match_info['attr']
     servers = await config.get_domain_config(domain, attr)
-    resp = dict(servers=servers)
+    resp = dict(servers=["#server 128.0.255.10:8088", "server 128.0.255.11:8080"], status="200", err_msg="")
     return web.json_response(resp)
 """
-
 
 async def get_domain_attrs(request):
     data = await request.post()

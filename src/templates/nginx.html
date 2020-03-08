@@ -2,6 +2,8 @@
   <head>
     <style type="text/css">
       li { list-style:none}
+      .offline {color: red;}
+      .online {color: green}
       html { font-size: 60px}
       form { margin: 100px 50px;}
       input { height:50px;width:50px;}
@@ -35,16 +37,20 @@ function get_backends(domain) {
           domain: domain,
       }
     }).always(function (data) {
-        //console.log(data.servers);
         var p = $("#servers");
         var li = $(".server");
         var h = $("#notice");
         li.remove();
         h.remove();
-        p.append("<h7 id='notice'>可用服务器列表:</h7>");
-        for (i=0; i< data.servers.length; i++) {
-            var server = data.servers[i]
-            p.append(`<li class='server'><input name='servers' type='checkbox' value=${server}></input>${server}</li>`);
+        if (data.status == 200 && data.err_msg == "") {
+          p.append("<h7 id='notice'>可用服务器列表:</h7>");
+          for (i=0; i< data.servers.length; i++) {
+              var full_server = data.servers[i];
+              var context = formatDisplay(full_server);
+              p.append(context);
+          };
+        }else{
+          alert(data.err_msg);
         };
     });
 };
@@ -52,16 +58,41 @@ function get_backends(domain) {
 $("input:radio[name='domain']").change(function() {
     var domain = this.value;
     get_backends(domain);
-    //console.log("servers is", servers);
 });
 
 function checkData(){
   var data=$("input:checkbox[name=servers]:checked").val();
+  var selected = $("input:checkbox[name=servers]:checked");
+  var servers = $("input:checkbox[name=servers]");
+  var _action = $("input:radio[name=action]:checked").val();
   if (typeof(data) == "undefined") {
       alert("请至少选择一台服务器进行操作!");
       return false;
   };
+  if (selected.length == servers.length && _action == "down") {
+    alert("不能全部同时下线，至少保留一台在线状态！");
+    return false;
+  };
   return true;
+};
+
+function formatDisplay(server) {
+  var _server_lst = server.split(" ");
+  var _tag = _server_lst[0];
+  var _server = _server_lst[1];
+  if (_tag.startsWith('#')) {
+    var _context = `
+      <li class='server'><input name='servers' type='checkbox' value=${_server}></input>
+        <span style="color:red">${_server}</span><span style="color:red;font-size:15px"> 已下线</span>
+      </li>
+     `;
+  }else{
+    var _context = `
+      <li class='server'><input name='servers' type='checkbox' value=${_server}></input>
+        <span style="color:green">${_server}</span><span style="color:green;font-size:15px"> 上线中</span>
+      </li>`;
+  };
+  return _context;
 };
 </script>
 </html>
