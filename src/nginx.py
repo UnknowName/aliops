@@ -5,6 +5,7 @@ from aiohttp import web
 
 import config
 from utils import run_remote_cmd, gener_cmd
+from utils import Gateway
 
 GLOBAL_NGINXS = config.NGINXS
 DOMAINS = config.DOMAINS
@@ -72,6 +73,7 @@ async def change_upstream(request):
         return web.Response(status=401)
 
 
+"""
 async def get_domain_attrs(request):
     data = await request.post()
     domain = data.get("domain")
@@ -79,3 +81,34 @@ async def get_domain_attrs(request):
     servers = await config.get_domain_config(domain, attr)
     resp = dict(servers=servers)
     return web.json_response(resp)
+"""
+
+
+async def get_domain_attrs(request):
+    data = await request.post()
+    domain = data.get("domain", "")
+    backend_port = await config.get_domain_config(domain, "backend_port")
+    config_file = await config.get_domain_config(domain, 'config_file')
+    domain_ngx = await config.get_domain_config(domain, 'nginx')
+    if isinstance(domain_ngx, dict) and domain_ngx:
+        nginxs = domain_ngx.get("hosts", [])
+        nginx_user = domain_ngx.get("ssh_user", "")
+    else:
+        nginxs = GLOBAL_NGINXS
+        nginx_user = GLOBAL_NGINX_USER
+    all_servers = [
+        Gateway(nginx_user, host).get_domain_servers(config_file, backend_port)
+        for host in nginxs
+    ]
+    servers_set = set(all_servers)
+    if len(servers_set) != 1:
+        response = dict(servres=[], status="501", err_msg="网关数据不一致")
+    else:
+        ok, servers = servers_set.pop()
+        if ok:
+            response = dict(servers=servers, status="200", err_msg="")
+        else:
+            # 如果远程命令失败，servers变量是标准错误输出
+            response = dict(servers=[], status="500", err_msg=servers)
+    return web.json_response(response)
+

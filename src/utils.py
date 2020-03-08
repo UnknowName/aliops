@@ -22,6 +22,56 @@ def gener_cmd(types: str, host: str, config_file: str) -> str:
     return raw_cmd
 
 
+class Gateway(object):
+    def __init__(self, user: str, host: str) -> None:
+        self.ssh_user = user
+        self.ssh_host = host
+
+    def _execute_cmd(self, command: str):
+        cmd = r"""ssh {user}@{host} '{command}'""".format(
+            user=self.ssh_user, host=self.ssh_host, command=command
+        )
+        cmd_obj = run(cmd, shell=True, stdout=PIPE, stderr=STDOUT)
+        output = cmd_obj.stdout.decode("utf8")
+        if cmd_obj.returncode == 0:
+            return True, output
+        return False, output
+
+    # 只返回指定端口的服务器，在线/下线状态由客户端JS判断
+    def _get_upstream_servers(self, config_file: str) -> tuple:
+        cmd_fmt = r"""grep -E "\s+#?\bserver\b\s+.*;" {config_file}"""
+        command = cmd_fmt.format(user=self.ssh_user, host=self.ssh_host, config_file=config_file)
+        ok, stdout = self._execute_cmd(command)
+        if ok and stdout:
+            all_server = set()
+            for line in stdout.split('\n'):
+                if not line:
+                    continue
+                _server = line.split(";")[0]
+                all_server.add(_server)
+            return True, tuple(all_server)
+        err_msg = stdout
+        return False, err_msg
+
+    def get_domain_servers(self, config_file: str, port: str):
+        ok, output = self._get_upstream_servers(config_file)
+        if ok:
+            hosts = set()
+            for server in output:
+                _, _port = server.split(":")
+                if _port == str(port):
+                    hosts.add(server)
+            return True, tuple(hosts)
+        return False, output
+
+    def check_config(self):
+        return self._execute_cmd("nginx -t")
+
+    def reload_service(self):
+        ok, _ = self._execute_cmd("nginx -t && nginx -s reload")
+        return ok
+
+
 if __name__ == "__main__":
     import asyncio
 
