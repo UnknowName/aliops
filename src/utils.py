@@ -1,3 +1,5 @@
+import re
+from functools import reduce
 from subprocess import run, PIPE, STDOUT
 
 
@@ -22,6 +24,15 @@ def gener_cmd(types: str, host: str, config_file: str) -> str:
     return raw_cmd
 
 
+def merge_results(results: list):
+    merged = set()
+    for i, result in enumerate(results):
+        if i == 0:
+            merged = set(result) | merged
+        merged = set(result) & merged
+    return tuple(merged)
+
+
 class Gateway(object):
     def __init__(self, user: str, host: str) -> None:
         self.ssh_user = user
@@ -37,8 +48,17 @@ class Gateway(object):
             return True, output
         return False, output
 
+    def _filter_upstream(self, line: str):
+        reg = re.compile(r'(\s+)?#?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
+        try:
+            # return is "# server 128.0.255.10:80" or "server 128.0.255.10:80"
+            return reg.match(line).group().strip()
+        except AttributeError:
+            return ""
+
     # 只返回指定端口的服务器，在线/下线状态由客户端JS判断
-    def _get_upstream_servers(self, config_file: str) -> tuple:
+    def _get_upstream_servers(self, config_file: str) -> (bool, set):
+        """返回Set类型，后续的检查相等函数用得上"""
         cmd_fmt = r"""grep -E "\s+#?\bserver\b\s+.*;" {config_file}"""
         command = cmd_fmt.format(user=self.ssh_user, host=self.ssh_host, config_file=config_file)
         ok, stdout = self._execute_cmd(command)
@@ -47,9 +67,10 @@ class Gateway(object):
             for line in stdout.split('\n'):
                 if not line:
                     continue
-                _server = line.split(";")[0]
-                all_server.add(_server.strip(" "))
-            return True, tuple(all_server)
+                upstream = self._filter_upstream(line)
+                if upstream:
+                    all_server.add(upstream)
+            return True, all_server
         err_msg = stdout
         return False, err_msg
 
@@ -57,11 +78,14 @@ class Gateway(object):
         ok, output = self._get_upstream_servers(config_file)
         if ok:
             hosts = set()
-            for upstream in output:
-                _, _port = upstream.split(":")
+            for _upstream in output:
+                _, _port = _upstream.split(":")
                 if _port == str(port):
-                    hosts.add(upstream.strip(" "))
-            return True, tuple(hosts)
+                    upstream = _upstream.strip(" ")
+                    if upstream.startswith("#"):
+                        upstream = re.sub(r'#\s+', '#', _upstream)
+                    hosts.add(upstream)
+            return True, hosts
         return False, output
 
     def check_config(self):
@@ -70,6 +94,14 @@ class Gateway(object):
     def reload_service(self):
         ok, _ = self._execute_cmd("nginx -t && nginx -s reload")
         return ok
+
+
+def check_equal(data: list):
+    def _check(x, y):
+        if x == y:
+            return x
+        return False
+    return reduce(_check, data)
 
 
 if __name__ == "__main__":

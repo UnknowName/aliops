@@ -5,7 +5,7 @@ from aiohttp import web
 
 import config
 from utils import run_remote_cmd, gener_cmd
-from utils import Gateway
+from utils import Gateway, check_equal
 
 GLOBAL_NGINXS = config.NGINXS
 DOMAINS = config.DOMAINS
@@ -100,15 +100,14 @@ async def get_domain_attrs(request):
         Gateway(nginx_user, host).get_domain_servers(config_file, backend_port)
         for host in nginxs
     ]
-    servers_set = set(all_servers)
-    if len(servers_set) != 1:
+    if not check_equal(all_servers):
         # 网关数据不一样，有可能是因为主机连接失败，打印到终端用于DEBUG
-        print(servers_set)
+        print(all_servers)
         response = dict(servres=[], status="501", err_msg="网关数据不一致")
     else:
-        ok, servers = servers_set.pop()
+        ok, servers = all_servers.pop()
         if ok:
-            response = dict(servers=servers, status="200", err_msg="")
+            response = dict(servers=tuple(servers), status="200", err_msg="")
         else:
             # 如果远程命令失败，servers变量是标准错误输出
             response = dict(servers=[], status="500", err_msg=servers)
