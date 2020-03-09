@@ -79,14 +79,16 @@ function checkData(){
 function formatDisplay(server) {
   var _server_lst = server.split(" ");
   var _tag = _server_lst[0];
-  var _server = _server_lst[1];
   if (_tag.startsWith('#')) {
+    //server = '#    server 128.0.255.10:80'
+    var _server = server.replace('#', '').trimStart().split(" ")[1];
     var _context = `
       <li class='server'><input name='servers' type='checkbox' value=${_server}></input>
         <span style="color:red">${_server}</span><span style="color:red;font-size:15px"> 已下线</span>
       </li>
      `;
   }else{
+    var _server = _server_lst[1];
     var _context = `
       <li class='server'><input name='servers' type='checkbox' value=${_server}></input>
         <span style="color:green">${_server}</span><span style="color:green;font-size:15px"> 上线中</span>
