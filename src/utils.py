@@ -28,10 +28,10 @@ class Gateway(object):
         self.ssh_host = host
 
     def _execute_cmd(self, command: str):
-        cmd = r"""ssh {user}@{host} '{command}'""".format(
+        _cmd = r"""ssh {user}@{host} '{command}'""".format(
             user=self.ssh_user, host=self.ssh_host, command=command
         )
-        cmd_obj = run(cmd, shell=True, stdout=PIPE, stderr=STDOUT)
+        cmd_obj = run(_cmd, shell=True, stdout=PIPE, stderr=STDOUT)
         output = cmd_obj.stdout.decode("utf8")
         if cmd_obj.returncode == 0:
             return True, output
@@ -57,10 +57,10 @@ class Gateway(object):
         ok, output = self._get_upstream_servers(config_file)
         if ok:
             hosts = set()
-            for server in output:
-                _, _port = server.split(":")
+            for upstream in output:
+                _, _port = upstream.split(":")
                 if _port == str(port):
-                    hosts.add(server)
+                    hosts.add(upstream.strip(" "))
             return True, tuple(hosts)
         return False, output
 
