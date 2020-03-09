@@ -48,7 +48,7 @@ class Gateway(object):
                 if not line:
                     continue
                 _server = line.split(";")[0]
-                all_server.add(_server)
+                all_server.add(_server.strip(" "))
             return True, tuple(all_server)
         err_msg = stdout
         return False, err_msg
