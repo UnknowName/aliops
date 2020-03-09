@@ -72,6 +72,7 @@ async def change_upstream(request):
     else:
         return web.Response(status=401)
 
+
 """
 async def get_domain_attrs(request):
     data = await request.post()
@@ -81,6 +82,7 @@ async def get_domain_attrs(request):
     resp = dict(servers=["#server 128.0.255.10:8088", "server 128.0.255.11:8080"], status="200", err_msg="")
     return web.json_response(resp)
 """
+
 
 async def get_domain_attrs(request):
     data = await request.post()
@@ -100,6 +102,8 @@ async def get_domain_attrs(request):
     ]
     servers_set = set(all_servers)
     if len(servers_set) != 1:
+        # 网关数据不一样，有可能是因为主机连接失败，打印到终端用于DEBUG
+        print(servers_set)
         response = dict(servres=[], status="501", err_msg="网关数据不一致")
     else:
         ok, servers = servers_set.pop()
@@ -109,4 +113,3 @@ async def get_domain_attrs(request):
             # 如果远程命令失败，servers变量是标准错误输出
             response = dict(servers=[], status="500", err_msg=servers)
     return web.json_response(response)
-
