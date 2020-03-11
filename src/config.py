@@ -38,10 +38,22 @@ def _get_domains() -> list:
     return _lst
 
 
+async def get_domain_nginxs(domain: str):
+    domain_ngx = await get_domain_config(domain, 'nginx')
+    if isinstance(domain_ngx, dict) and domain_ngx:
+        nginxs = domain_ngx.get("hosts")
+        nginx_user = domain_ngx.get("ssh_user")
+    else:
+        global_nginx = _get_attr('nginx')
+        nginxs = global_nginx.get("hosts")
+        nginx_user = global_nginx.get("ssh_user")
+    return nginxs, nginx_user
+
+
 _nginx = _get_attr('nginx')
-DOMAINS = _get_domains()
 NGINXS = _nginx.get('hosts')
 NGINX_USER, NGINX_PASSWORD = _nginx.get('ssh_user'), _nginx.get('ssh_password')
+DOMAINS = _get_domains()
 AESKEY = _get_attr("api").get("aeskey")
 AESKEY_SECRET = _get_attr("api").get("aeskey_secret")
 REGION = _get_attr("api").get("region")
@@ -54,5 +66,5 @@ if __name__ == '__main__':
     print(AESKEY, AESKEY_SECRET)
     import asyncio
     # nginx = get_domain_config("www.unknowname.win", "nginx")
-    config = get_domain_config("www.unknowname.win", 'ips')
+    config = get_domain_config("www.unknowname.win", 'config_file')
     print(asyncio.run(config))

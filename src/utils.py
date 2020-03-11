@@ -1,29 +1,12 @@
 import re
+import yaml
 from functools import reduce
 from subprocess import run, PIPE, STDOUT
 
-
-async def run_remote_cmd(user: str, host: str, raw_cmd: str) -> bool:
-    command = "ssh {user}@{host} '{cmd}'".format(user=user, host=host, cmd=raw_cmd)
-    print("Run origin command {}".format(command))
-    cmd_obj = run(command, shell=True, stdout=PIPE, stderr=STDOUT)
-    if cmd_obj.returncode == 0:
-        return True
-    print("Host {} Run cmd failed, {}".format(host, cmd_obj.stdout.decode("utf8")))
-    return False
+CONFIG_FILE = "config.yml"
 
 
-def gener_cmd(types: str, host: str, config_file: str) -> str:
-    cmd_fmt = r'sed --follow-symlinks -ri "s/{types}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
-    if types == "up":
-        raw_cmd = cmd_fmt.format(types="#+", host=host, filename=config_file, flag="")
-    elif types == "down":
-        raw_cmd = cmd_fmt.format(types="", host=host, filename=config_file, flag="#")
-    else:
-        raw_cmd = ""
-    return raw_cmd
-
-
+"""
 def merge_results(results: list):
     merged = set()
     for i, result in enumerate(results):
@@ -31,6 +14,7 @@ def merge_results(results: list):
             merged = set(result) | merged
         merged = set(result) & merged
     return tuple(merged)
+"""
 
 
 class Gateway(object):
@@ -88,15 +72,71 @@ class Gateway(object):
             return True, hosts
         return False, output
 
+    def set_upstreams_status(self, upstreams: list, status: str, config_path: str):
+        cmd_fmt = r'sed --follow-symlinks -ri "s/{status}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
+        raw_cmd = ""
+        for _upstream in upstreams:
+            if status == "up":
+                _cmd = cmd_fmt.format(status="#+", host=_upstream, filename=config_path, flag="")
+            elif status == "down":
+                _cmd = cmd_fmt.format(status="", host=_upstream, filename=config_path, flag="#")
+            else:
+                _cmd = ""
+            raw_cmd += "{}&&".format(_cmd)
+        _ok, _stdout = self._execute_cmd(raw_cmd.rstrip("&&"))
+        if _ok:
+            _ok, _stdout = self._reload_service()
+        else:
+            return False, _stdout
+        return _ok, _stdout
+
     def check_config(self):
         return self._execute_cmd("nginx -t")
 
-    def reload_service(self):
-        ok, _ = self._execute_cmd("nginx -t && nginx -s reload")
-        return ok
+    def _reload_service(self):
+        return self._execute_cmd("nginx -t && nginx -s reload")
 
 
-def check_equal(data: list):
+class AppConfig(object):
+    def __init__(self, config_path: str = "") -> None:
+        _config_file = config_path if config_path else CONFIG_FILE
+        with open(_config_file) as f:
+            conf_dict = yaml.safe_load(f)
+        self._config_dic = conf_dict
+
+    def get_all_domains(self, name: str = "") -> list:
+        """Support change NGINX upstream's domains"""
+        _all_domains = self.get_attr("domains")
+        if name == "nginx":
+            _attr = "backend_port"
+        elif name == "slb":
+            _attr = "slbs"
+        else:
+            _attr = ""
+        _domains = list()
+        for _domain_dic in _all_domains:
+            for _domain, _value in _domain_dic.items():
+                if _attr and _value.get(_attr):
+                    _domains.append(_domain)
+        return _domains
+
+    def get_attr(self, attr: str) -> dict:
+        return self._config_dic.get(attr)
+
+    def get_domain(self, domain: str) -> dict:
+        _domains = self._config_dic.get("domains")
+        for _index, _domain in enumerate(_domains):
+            if domain in _domain:
+                return _domain[domain]
+
+    def get_domain_nginxs(self, domain: str) -> tuple:
+        _domain_dict = self.get_domain(domain)
+        _exist_nginx = _domain_dict.get("nginx")
+        _nginx = _exist_nginx if _exist_nginx else self.get_attr("nginx")
+        return _nginx.get("ssh_user"), tuple(_nginx.get("hosts"))
+
+
+def check_equal(data: list) -> tuple:
     def _check(x, y):
         if x == y:
             return x
@@ -105,6 +145,7 @@ def check_equal(data: list):
 
 
 if __name__ == "__main__":
+    """
     import asyncio
 
     loop = asyncio.get_event_loop()
@@ -115,3 +156,7 @@ if __name__ == "__main__":
     task = loop.create_task(run_remote_cmd('root', server, cmd))
     loop.run_until_complete(task)
     loop.close()
+    """
+    test_domain = "dev.siss.io"
+    config = AppConfig("config.yml")
+    print(config.get_all_domains("slb"))
