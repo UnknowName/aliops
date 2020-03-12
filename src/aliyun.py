@@ -51,17 +51,20 @@ async def slb_index(request):
 
 async def get_slb_backends(request):
     if request.method == "POST":
+        # 返回给用户的Response
+        resp = dict()
         data = await request.post()
         req = DescribeLoadBalancerAttributeRequest()
         req.set_accept_format('json')
         req.set_LoadBalancerId(data.get("slb_id", ""))
         response = json.loads(client.do_action_with_exception(req).decode("utf8"))
-        resp = dict()
         resp["name"] = response.get("LoadBalancerName")
         resp["ip"] = response.get("Address")
-        servers = response.get("BackendServers").get("BackendServer")
+        default_backends = response.get("BackendServers").get("BackendServer")
+        # Key为ECS ID, Value为权重
+        backend_dic = {k.get("ServerId"): k.get("Weight") for k in default_backends}
         # 先获取SLB默认后端的ECS的ID，SLB只提供该API
-        ecs_ids = [server.get("ServerId") for server in servers]
+        ecs_ids = [ecs_id for ecs_id in backend_dic]
         # 拿到ECS ID后，再获取该ECS详细信息，最终返回给页面渲染
         req = DescribeInstancesRequest()
         req.set_accept_format('json')
@@ -81,6 +84,7 @@ async def get_slb_backends(request):
                 item['private_ip'] = instance.get("NetworkInterfaces").get("NetworkInterface")[0].get(
                     "PrimaryIpAddress")
             item['public_ip'] = instance.get("PublicIpAddress").get("IpAddress")[0]
+            item['weight'] = backend_dic.get(item["id"])
             _results.append(item)
         resp["servers"] = _results
         return web.json_response(resp)
@@ -123,6 +127,8 @@ async def dns_get_ip(request):
         full_domain = data.get("domain")
         domain_dic = config.get_domain(full_domain)
         dns_domain = domain_dic.get('domain')
+        if not dns_domain:
+            print("The domain in config.yml not set domain attribute")
         # 通过索引切片，获取最前面的RR值。如www.unknowname.win取值www
         full_len = len(full_domain)
         domain_len = len(dns_domain) + 1
