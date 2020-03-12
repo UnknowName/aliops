@@ -6,17 +6,6 @@ from subprocess import run, PIPE, STDOUT
 CONFIG_FILE = "config.yml"
 
 
-"""
-def merge_results(results: list):
-    merged = set()
-    for i, result in enumerate(results):
-        if i == 0:
-            merged = set(result) | merged
-        merged = set(result) & merged
-    return tuple(merged)
-"""
-
-
 class Gateway(object):
     def __init__(self, user: str, host: str) -> None:
         self.ssh_user = user
@@ -33,7 +22,7 @@ class Gateway(object):
         return False, output
 
     def _filter_upstream(self, line: str):
-        reg = re.compile(r'(\s+)?#?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
+        reg = re.compile(r'(\s+)?(#+)?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
         try:
             # return is "# server 128.0.255.10:80" or "server 128.0.255.10:80"
             return reg.match(line).group().strip()
@@ -43,7 +32,7 @@ class Gateway(object):
     # 只返回指定端口的服务器，在线/下线状态由客户端JS判断
     def _get_upstream_servers(self, config_file: str) -> (bool, set):
         """返回Set类型，后续的检查相等函数用得上"""
-        cmd_fmt = r"""grep -E "\s+#?\bserver\b\s+.*;" {config_file}"""
+        cmd_fmt = r"""grep -E "\s+#+?\bserver\b\s+.*;" {config_file}"""
         command = cmd_fmt.format(user=self.ssh_user, host=self.ssh_host, config_file=config_file)
         ok, stdout = self._execute_cmd(command)
         if ok and stdout:
@@ -74,7 +63,7 @@ class Gateway(object):
 
     def set_upstreams_status(self, upstreams: list, status: str, config_path: str):
         cmd_fmt = r'sed --follow-symlinks -ri "s/{status}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
-        raw_cmd = ""
+        cmds = list()
         for _upstream in upstreams:
             if status == "up":
                 _cmd = cmd_fmt.format(status="#+", host=_upstream, filename=config_path, flag="")
@@ -82,8 +71,8 @@ class Gateway(object):
                 _cmd = cmd_fmt.format(status="", host=_upstream, filename=config_path, flag="#")
             else:
                 _cmd = ""
-            raw_cmd += "{}&&".format(_cmd)
-        _ok, _stdout = self._execute_cmd(raw_cmd.rstrip("&&"))
+            cmds.append(_cmd)
+        _ok, _stdout = self._execute_cmd("&&".join(cmds))
         if _ok:
             _ok, _stdout = self._reload_service()
         else:
@@ -111,6 +100,8 @@ class AppConfig(object):
             _attr = "backend_port"
         elif name == "slb":
             _attr = "slbs"
+        elif name == "dns":
+            _attr = "ips"
         else:
             _attr = ""
         _domains = list()
@@ -159,4 +150,4 @@ if __name__ == "__main__":
     """
     test_domain = "dev.siss.io"
     config = AppConfig("config.yml")
-    print(config.get_all_domains("slb"))
+    print(config.get_domain("dev.siss.io"))

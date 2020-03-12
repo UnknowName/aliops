@@ -13,11 +13,13 @@ domains:
       backend_port: 8080
       config_file: /etc/nginx/conf.d/dev.siss.io.conf
       slbs:
-        - lb-wz9d9j05rzlyok300fcf4
-        - lb-wz9obyqmiidllwulomjxh
+        # No set, will no display on /slb url
+        # - lb-wz9d9j05rzlyok300fcf4
+        # - lb-wz9obyqmiidllwulomjxh
       ips:
+        # No set,  will no display on /dns url
         - 120.77.199.116
-        - 47.107.24.104
+        # - 47.107.24.104
 
   - www.unknowname.win:
       # for change dns record
@@ -40,11 +42,11 @@ nginx:
     - 128.0.255.13
 
 api:
-  aeskey: keyid
-  aeskey_secret: key-secret
+  aeskey: aesky
+  aeskey_secret: aeskey-secret
   region: cn-shenzhen
 
 dns_api:
-  aeskey: aaa
-  aeskey_secret: bbb
+  aeskey: ""
+  aeskey_secret: ""
   region: cn-shenzhen

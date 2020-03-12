@@ -11,11 +11,18 @@ from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import 
 from aliyunsdkalidns.request.v20150109.UpdateDomainRecordRequest import UpdateDomainRecordRequest
 from aliyunsdkalidns.request.v20150109.DescribeDomainRecordsRequest import DescribeDomainRecordsRequest
 
-import config
+from utils import AppConfig
 
-DOMAINS = config.DOMAINS
-dns_client = client = AcsClient(config.AESKEY, config.AESKEY_SECRET, config.REGION)
-# dns_client = AcsClient(config.DNS_AESKEY, config.DNS_SECRET, config.DNS_REGION)
+config = AppConfig()
+api_dic = config.get_attr("api")
+aeskey, secret, region = api_dic.get("aeskey"), api_dic.get("aeskey_secret"), api_dic.get("region")
+client = AcsClient(aeskey, secret, region)
+dns_api = config.get_attr("dns_api")
+dns_key, dns_secret, dns_region = dns_api.get("aeskey"), dns_api.get("aeskey_secret"), dns_api.get("region")
+if dns_key and dns_region and dns_secret:
+    dns_client = AcsClient(dns_key, dns_secret, dns_region)
+else:
+    dns_client = client
 
 
 @aiohttp_jinja2.template("aliyun.html")
@@ -23,10 +30,10 @@ async def slb_index(request):
     if request.method == "GET":
         req = DescribeLoadBalancerAttributeRequest()
         responses = list()
-        for domain in DOMAINS:
-            domain_slbs = await config.get_domain_config(domain, 'slbs')
-            if not domain_slbs:
-                continue
+        slb_domains = config.get_all_domains("slb")
+        for domain in slb_domains:
+            domain_dic = config.get_domain(domain)
+            domain_slbs = domain_dic.get("slbs")
             domain_addr = socket.getaddrinfo(domain, None)[0][4][0]
             req.set_accept_format('json')
             current_slbs = list()
@@ -65,6 +72,7 @@ async def get_slb_backends(request):
         _results = []
         for instance in instances:
             item = dict()
+            # 返回的实例信息中，不包含该服务器在SLB中的权重
             item["name"] = instance.get("InstanceName")
             item["id"] = instance.get("InstanceId")
             if instance.get("InstanceNetworkType") == "classic":
@@ -106,22 +114,22 @@ async def change_slb_backend(request):
 
 @aiohttp_jinja2.template("dns.html")
 async def dns_index(request):
-    if request.method == 'GET':
-        return {'domains': config.DOMAINS}
+    return {'domains': config.get_all_domains("dns")}
 
 
 async def dns_get_ip(request):
     if request.method == 'POST':
         data = await request.post()
         full_domain = data.get("domain")
-        domain = await config.get_domain_config(full_domain, 'domain')
+        domain_dic = config.get_domain(full_domain)
+        dns_domain = domain_dic.get('domain')
         # 通过索引切片，获取最前面的RR值。如www.unknowname.win取值www
         full_len = len(full_domain)
-        domain_len = len(domain) + 1
+        domain_len = len(dns_domain) + 1
         query_keyword = full_domain[:full_len - domain_len]
         request = DescribeDomainRecordsRequest()
         request.set_accept_format('json')
-        request.set_DomainName(domain)
+        request.set_DomainName(dns_domain)
         request.set_Lang("en")
         request.set_PageSize(20)
         request.set_KeyWord(query_keyword)
@@ -129,7 +137,7 @@ async def dns_get_ip(request):
             response = dns_client.do_action_with_exception(request)
             resp = str(response, encoding='utf-8')
             detail = json.loads(resp)
-            backup_ips = await config.get_domain_config(full_domain, 'ips')
+            backup_ips = domain_dic.get("ips")
             detail["BackupIPs"] = backup_ips
             return web.json_response(detail)
         except Exception as e:
@@ -140,8 +148,9 @@ async def dns_get_ip(request):
 async def dns_change_ip(request):
     domain = request.query.get("domain")
     ip = request.query.get("ip")
-    ips = await config.get_domain_config(domain, 'ips')
-    if ip not in ips:
+    domain_dic = config.get_domain(domain)
+    backup_ips = domain_dic.get('ips')
+    if ip not in backup_ips:
         resp = dict(msg="非法IP!修改只限已给定列表中的IP")
         return web.json_response(resp)
     record_id = request.query.get("id")
