@@ -61,11 +61,19 @@ function getSlbInfo(slb_id) {
           var serverName = backendServers[i].name;
           var serverInnerIP = backendServers[i].private_ip;
           var serverPublicIP = backendServers[i].public_ip;
+          var serverWeight = backendServers[i].weight;
+          if (serverWeight == 0) {
+            var color = "red";
+            var notice = `<span style="font-size:20px">已下线</span>`;
+          }else {
+            var color = "green";
+            var notice = `<span style="font-size:20px">上线中</span>`;
+          };
           var html = `
-            <li class="server">
-              <p>ECS名称 ${serverName}</p>
-              <p>ECS内网IP ${serverInnerIP}</p>
-              <p>ECS外网IP ${serverPublicIP}</p>
+            <li class="server" style="color: ${color};margin: 10px 10px" id="${serverId}">
+              <p>ECS名称:   ${serverName}</p>
+              <p>ECS内网IP: ${serverInnerIP}</p>
+              <p>ECS外网IP: ${serverPublicIP}&nbsp;&nbsp;${notice}</p>
               <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'offline')">下线</button>
               <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'online')">上线</button>
             </li>
@@ -89,7 +97,17 @@ function changeServerStatus(ecsId, slbId, action) {
             for(var i=0;i<servers.length;i++) {
                 server = servers[i];
                 if (server.ServerId == ecsId) {
+                    var serverId = "#" + server.ServerId;
+                    serverObject = $(serverId);
+                    if (action == "offline") {
+                        serverObject.css("color", "red");
+                        var newHtml = serverObject.html().replace("上线中", "已下线");
+                    }else{
+                        serverObject.css("color", "green");
+                        var newHtml = serverObject.html().replace("已下线", "上线中");
+                    };
                     alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
+                    serverObject.html(newHtml);
                 };
             };
         } else {
