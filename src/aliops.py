@@ -30,7 +30,7 @@ def main():
         web.get('/check/{domain}', check),
     ]
     app.add_routes(routes)
-    web.run_app(app, port=8080)
+    web.run_app(app, port=8080, access_log=None)
 
 
 async def _get_status(site: str, host: str):

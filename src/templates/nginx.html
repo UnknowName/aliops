@@ -1,33 +1,56 @@
 <html>
-  <head>
+<head>
     <style type="text/css">
-      li { list-style:none}
-      .offline {color: red;}
-      .online {color: green}
-      html { font-size: 60px}
-      form { margin: 100px 50px;}
-      input { height:50px;width:50px;}
+      input { height:25px; width:25px; }
+      li { list-style:none; font-size: 30px;}
+      div { float: left; margin: 5px 15px; min-width: 800px; min-height: 10%; font-size: 20px;}
+      .domains     { font-size: 30px; }
+      #server-up   { min-width: 10%;}
+      #server-down { min-width: 10%;}
     </style>
     <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-  </head>
+    <link rel="stylesheet" href="https://cdn.bootcss.com/bootstrap/4.0.0/css/bootstrap.min.css"
+          integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous"/>
+</head>
   <body>
-<form name="nginx" method="post" action="nginx" onsubmit="return checkData()" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
-  <p>
-  请选择要操作的域名:
-  {% for domain in domains %}
-    <li><input name="domain"  type="radio" value="{{ domain }}"/>{{ domain }}</li>
-  {% endfor %}
-  </p>
-  <p id="servers">
-  </p>
-  操作类型:
-  <input type="radio" name="action" checked value="up">上线</input>
-  <input type="radio" name="action" value="down">下线</input>
-  <p><input type="submit" style="width:150px;height:100px" value="修改"/></p>
-</form>
-</body>
+    <div id="main">
+      <h3>请选择要操作的域名</h3>
+      <form id="form" onsubmit="return checkData()">
+        <!--
+        <form id="form" method="post" action="nginx" onsubmit="return checkData()" accept-charset="utf-8" enctype="application/x-www-form-urlencoded">
+        -->
+        <!--域名展示开始-->
+        <ul>
+          {% for domain in domains %}
+            <li class="domains"><input name="domain"  type="radio" value="{{ domain }}"/>{{ domain }}</li>
+          {% endfor %}
+        </ul>
+        <!--域名展示结束-->
+        <!--下线列表服务器HTML开始-->
+        <div id="server-down">
+          <!--test for display
+          <h4>已下线服务器列表: </h4>
+          <li><input name="servers-down" type="checkbox" value="128.0.255.11">128.0.255.11</input></li>
+          操作类型: <input type="radio" name="down-action" checked value="up">上线</input>
+          -->
+        </div>
+        <!--下线列表服务器HTML结束-->
+        <!--上线列表服务器HTML开始-->
+        <div id="server-up">
+          <!--test for display
+          <h4>上线中服务器列表: </h4>
+          <li><input type="checkbox" value="128.0.255.10">128.0.255.10</input></li>
+          -->
+        </div>
+        <!--上线列表服务器HTML结束-->
+      </form>
+      <div>
+          <p><input type="submit" onclick="postData()" style="width:80px;height:50px" value="修改"/></p>
+      </div>
+    </div>
+  </body>
 <script>
+// 当选中相关域名时,动态AJAX请求
 function get_backends(domain) {
     $.ajax({
       type: "POST",
@@ -37,64 +60,154 @@ function get_backends(domain) {
           domain: domain,
       }
     }).always(function (data) {
-        var p = $("#servers");
-        var li = $(".server");
-        var h = $("#notice");
-        li.remove();
-        h.remove();
         if (data.status == 200 && data.err_msg == "") {
-          p.append("<h7 id='notice'>可用服务器列表:</h7>");
-          for (i=0; i< data.servers.length; i++) {
-              var full_server = data.servers[i];
-              var context = formatDisplay(full_server);
-              p.append(context);
+          var serverDown = $("#server-down");
+          var serverUp = $("#server-up");
+          var serverObj = getUpDown(data.servers);
+          var downServers = serverObj.downServers;
+          var upServers = serverObj.upServers;
+          if (downServers.length == 0){
+            serverDown.append("<p>暂无下线服务器</p>");
+          }else{
+            appendToDiv(serverDown, downServers, "down");
+          };
+          if (upServers.length == 0){
+            serverUp.append("<p>暂无上线中服务器</p>");
+          }else{
+            appendToDiv(serverUp, upServers, "up");
           };
         }else{
-          alert(data.err_msg);
+          alert(`发生错误: ${data.err_msg}`);
         };
     });
 };
 
+// 获取选中的事件触发AJAX请求
 $("input:radio[name='domain']").change(function() {
     var domain = this.value;
     get_backends(domain);
 });
 
 function checkData(){
-  var data=$("input:checkbox[name=servers]:checked").val();
-  var selected = $("input:checkbox[name=servers]:checked");
-  var servers = $("input:checkbox[name=servers]");
-  var _action = $("input:radio[name=action]:checked").val();
-  if (typeof(data) == "undefined") {
+  // 已下线服务器，在已下线列表中未选中的数据
+  var downServers=$("input:checkbox[name=servers-down]");
+  // 待下线服务器，在已上线列表中选中的数据
+  var downData=$("input:checkbox[name='servers-up']:checked");
+  // 已上线服务器，在上线列表中所有的数据
+  var upServers=$("input:checkbox[name=servers-up]");
+  // 待上线服务器
+  var upData=$("input:checkbox[name=servers-down]:checked");
+  // 所有服务器
+  var all=$("input:checkbox");
+  if (downData.length == 0 && upData.length == 0) {
       alert("请至少选择一台服务器进行操作!");
       return false;
   };
-  if (selected.length == servers.length && _action == "down") {
+  if ((downServers.length + downData.length) == all.length) {
     alert("不能全部同时下线，至少保留一台在线状态！");
     return false;
   };
   return true;
 };
 
-function formatDisplay(server) {
-  var _server_lst = server.split(" ");
-  var _tag = _server_lst[0];
-  if (_tag.startsWith('#')) {
-    //server = '#    server 128.0.255.10:80'
-    var _server = server.replace('#', '').trimStart().split(" ")[1];
-    var _context = `
-      <li class='server'><input name='servers' type='checkbox' value=${_server}></input>
-        <span style="color:red">${_server}</span><span style="color:red;font-size:15px"> 已下线</span>
-      </li>
-     `;
-  }else{
-    var _server = _server_lst[1];
-    var _context = `
-      <li class='server'><input name='servers' type='checkbox' value=${_server}></input>
-        <span style="color:green">${_server}</span><span style="color:green;font-size:15px"> 上线中</span>
-      </li>`;
+// 将服务器列表分离出上/下线的机器
+function getUpDown(servers){
+  var _downServers = new Array();
+  var _upServers = new Array();
+  for (i=0; i< servers.length; i++) {
+    var _server = servers[i];
+    var _server_lst = _server.split(" ");
+    var _tag = _server_lst[0];
+    if (_tag.startsWith('#')) {
+      var _server = _server.replace('#', '').trimStart().split(" ")[1];
+      _downServers.push(_server);
+    }else{
+      var _server = _server_lst[1];
+      _upServers.push(_server);
+    };
   };
-  return _context;
+  return {downServers: _downServers, upServers: _upServers};
+};
+
+// 将指定服务信息添加进DIV中
+function appendToDiv(div, servers, type){
+  // 增加头部信息
+  if (type == "down"){
+    var color = "red";
+    div.append("<h4>已下线服务器列表: </h4>");
+  }else if (type == "up"){
+    var color = "green";
+    div.append("<h4>在线中服务器列表: </h4>");
+  };
+  for (var i = 0;i < servers.length; i++){
+    var _context = `
+      <li style="color:${color}">
+        <input name="servers-${type}" type="checkbox" value="${servers[i]}">${servers[i]}</input>
+      </li>
+    `;
+    div.append(_context);
+  };
+  // 增加尾部信息
+  if (type == "down"){
+    div.append(`操作类型: <input type="radio" name="up-action" checked value="up">上线</input>`);
+  }else if (type == "up"){
+    div.append(`操作类型: <input type="radio" name="down-action" checked value="down">下线</input>`);
+  };
+};
+
+function sleep(d){
+  for(var t = Date.now();Date.now() - t <= d;);
+};
+
+function getFormObj(formId) {
+    var formObj = {};
+    var inputs = $('#'+formId).serializeArray();
+    $.each(inputs, function (i, input) {
+        /*
+        if (formObj[input.name].startsWith("servers")){
+          formObj[input.name] = new Array();
+        }
+        */
+        formObj[input.name] = input.value;
+    });
+    return formObj;
+};
+
+function postData() {
+  if (checkData()) {
+    var _domain = $("input:radio[name='domain']").val();
+    var _downServers = new Array();
+    var _upServers = new Array();
+    $("input:checkbox[name=servers-down]:checked").each(function(){
+      _downServers.push($(this).val());
+    });
+    $("input:checkbox[name=servers-up]:checked").each(function(){
+      _upServers.push($(this).val());
+    });
+    if (_downServers.length == 0){
+      _downServer = "";
+    }else{
+      _downServer = _downServers.join(",");
+    };
+    if (_upServers.length == 0){
+      _upServer = "";
+    }else{
+      _upServer = _upServers.join(",");
+    };
+    $.ajax({
+      type: "POST",
+      url: "nginx",
+      dataType: "json",
+      data: {
+          domain: _domain,
+          down_servers: _downServer,
+          up_servers: _upServer,
+      }
+    }).always(function (respData) {
+      alert(respData.msg);
+      window.location.reload();
+    });
+  };
 };
 </script>
 </html>

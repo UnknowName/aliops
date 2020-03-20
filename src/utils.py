@@ -79,6 +79,31 @@ class Gateway(object):
             return False, _stdout
         return _ok, _stdout
 
+    def set_upstream_status(self, upstream: dict, config_path: str):
+        """
+        :param upstream: {"down_servers":["1.1.1.1", "2.2.2.2"], "up_servers":["3.3.3.3","4.4.4.4"]}
+        :param config_path:
+        :return:
+        """
+        _down_servers = upstream.get("down_servers", [])
+        _up_servers = upstream.get("up_servers", [])
+        _cmd_fmt = r'sed --follow-symlinks -ri "s/{status}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
+        _cmds = list()
+        if _down_servers and _down_servers[0] != "":
+            [_cmds.append(_cmd_fmt.format(status="#+", host=_upstream, filename=config_path, flag=""))
+                for _upstream in _down_servers
+            ]
+        if _up_servers and _up_servers[0] != "":
+            [_cmds.append(_cmd_fmt.format(status="", host=_upstream, filename=config_path, flag="#"))
+                for _upstream in _up_servers
+            ]
+        _ok, _stdout = self._execute_cmd("&&".join(_cmds))
+        if _ok:
+            _ok, _stdout = self._reload_service()
+        else:
+            return False, _stdout
+        return _ok, _stdout
+
     def check_config(self):
         return self._execute_cmd("nginx -t")
 
