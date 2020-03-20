@@ -178,7 +178,7 @@ function getFormObj(formId) {
 
 function postData() {
   if (checkData()) {
-    var _domain = $("input:radio[name='domain']").val();
+    var _domain = $("input:radio[name=domain]:checked").val();
     var _downServers = new Array();
     var _upServers = new Array();
     $("input:checkbox[name=servers-down]:checked").each(function(){
