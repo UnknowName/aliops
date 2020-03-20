@@ -67,11 +67,13 @@ function get_backends(domain) {
           var downServers = serverObj.downServers;
           var upServers = serverObj.upServers;
           if (downServers.length == 0){
+            serverDown.html("");
             serverDown.append("<p>暂无下线服务器</p>");
           }else{
             appendToDiv(serverDown, downServers, "down");
           };
           if (upServers.length == 0){
+            serverUp.html("");
             serverUp.append("<p>暂无上线中服务器</p>");
           }else{
             appendToDiv(serverUp, upServers, "up");
@@ -131,6 +133,7 @@ function getUpDown(servers){
 
 // 将指定服务信息添加进DIV中
 function appendToDiv(div, servers, type){
+  div.html("");
   // 增加头部信息
   if (type == "down"){
     var color = "red";
@@ -148,10 +151,10 @@ function appendToDiv(div, servers, type){
     div.append(_context);
   };
   // 增加尾部信息
-  if (type == "down"){
-    div.append(`操作类型: <input type="radio" name="up-action" checked value="up">上线</input>`);
-  }else if (type == "up"){
-    div.append(`操作类型: <input type="radio" name="down-action" checked value="down">下线</input>`);
+  if (type == "down" && servers.length != 0){
+    div.append(`<p class="server-list">操作类型: <input type="radio" name="up-action" checked>上线</input></p>`);
+  }else if (type == "up" && servers.length !=0 ){
+    div.append(`<p class="server-list">操作类型: <input type="radio" name="down-action" checked>下线</input></p>`);
   };
 };
 
