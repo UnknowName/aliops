@@ -112,6 +112,14 @@ class Gateway(object):
 
 
 class AppConfig(object):
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            obj = object.__new__(cls, *args, **kwargs)
+            cls._instance = obj
+        return cls._instance
+
     def __init__(self, config_path: str = "") -> None:
         _config_file = config_path if config_path else CONFIG_FILE
         with open(_config_file) as f:
