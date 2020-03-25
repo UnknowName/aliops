@@ -116,7 +116,7 @@ class AppConfig(object):
 
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            obj = object.__new__(cls, *args, **kwargs)
+            obj = super(AppConfig, cls).__new__(cls)
             cls._instance = obj
         return cls._instance
 
