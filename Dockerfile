@@ -1,4 +1,5 @@
 FROM python:3.7-alpine
+ADD ./Pipfile /opt/app
 ADD ./src /opt/app
 WORKDIR /opt/app
 RUN adduser -D -u 120002 -h /opt/app app \
@@ -7,8 +8,10 @@ RUN adduser -D -u 120002 -h /opt/app app \
     && echo "StrictHostKeyChecking=no" > .ssh/config \
     && apk add gcc musl-dev libffi-dev make tzdata openssl-dev linux-headers openssh-client \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt\
-    && apk del libffi-dev tzdata gcc make linux-headers openssl-dev musl-dev\
+    && pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ pipenv\
+    && pipenv lock \
+    && pipenv install --system --deploy \
+    && apk del libffi-dev gcc make linux-headers openssl-dev musl-dev\
     && rm -rf /var/cache/apk/*
 ADD id_rsa  /opt/app/.ssh/
 RUN chmod 600 /opt/app/.ssh/* \

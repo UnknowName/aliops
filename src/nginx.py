@@ -6,7 +6,7 @@ from aiohttp import web
 from utils import AppConfig, Gateway, check_equal
 
 log_fmt = "%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s"
-logging.basicConfig(level=logging.DEBUG, format=log_fmt)
+logging.basicConfig(level=logging.INFO, format=log_fmt)
 logger = logging.getLogger("aiohttp")
 config = AppConfig()
 
