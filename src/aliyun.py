@@ -32,9 +32,10 @@ async def slb_index(request):
         responses = list()
         slb_domains = config.get_all_domains("slb")
         for domain in slb_domains:
+            _domain = domain.split("_")[0]
             domain_dic = config.get_domain(domain)
             domain_slbs = domain_dic.get("slbs")
-            domain_addr = socket.getaddrinfo(domain, None)[0][4][0]
+            domain_addr = socket.getaddrinfo(_domain, None)[0][4][0]
             req.set_accept_format('json')
             current_slbs = list()
             # 检查SLB的IP地址与当前解析IP一致，不一致不返回。过滤掉备用的SLB
@@ -124,8 +125,9 @@ async def dns_index(request):
 async def dns_get_ip(request):
     if request.method == 'POST':
         data = await request.post()
-        full_domain = data.get("domain")
-        domain_dic = config.get_domain(full_domain)
+        _config_domain = data.get("domain")
+        full_domain = _config_domain.split("_")[0]
+        domain_dic = config.get_domain(_config_domain)
         dns_domain = domain_dic.get('domain')
         if not dns_domain:
             print("The domain in config.yml not set domain attribute")

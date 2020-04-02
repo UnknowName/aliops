@@ -55,8 +55,11 @@ function GetDomainIp(domain) {
             var record = records[i].RR;
             var domainName = records[i].DomainName;
             var full_domain = `${record}.${domainName}`;
+            /* domain = www.unknowname.win_18911 */
+            _domain = domain.split("_")[0];
+            console.log(_domain);
             /*保证一定是A记录，后端强制只能修改A记录*/
-            if ( recordLine == 'default' && recordType == 'A' && full_domain == domain) {
+            if ( recordLine == 'default' && recordType == 'A' && full_domain == _domain) {
                 var recordIP = records[i].Value;
                 var recordID = records[i].RecordId;
                 var backupIps = data.BackupIPs;

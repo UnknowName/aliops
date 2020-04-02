@@ -1,7 +1,7 @@
 domains:
-  - dev.siss.io:
+  - www.unknowname.win_18912:
       # for change dns record
-      domain: siss.io
+      domain: unknowname.win
       # for nginx
       nginx:
         ssh_user: username
@@ -19,9 +19,8 @@ domains:
       ips:
         # No set,  will no display on /dns url
         - 120.77.199.116
-        # - 47.107.24.104
 
-  - www.unknowname.win:
+  - www.unknowname.win_10050:
       # for change dns record
       domain: unknowname.win
       # for nginx
@@ -31,9 +30,7 @@ domains:
         - lb-wz9d9j05rzlyok300fcf4 #Jumpserver
         - lb-wz9obyqmiidllwulomjxh #test
       ips:
-        - 47.107.24.104
-        - 47.107.17.249
-        - 120.77.111.55
+        - 128.0.255.10
 # Global NGINX.if domains section no nginx present,use here
 nginx:
   ssh_user: username

@@ -1,6 +1,6 @@
 FROM python:3.7-alpine
-ADD ./Pipfile /opt/app
 ADD ./src /opt/app
+ADD ./Pipfile /opt/app
 WORKDIR /opt/app
 RUN adduser -D -u 120002 -h /opt/app app \
     && mkdir .ssh \
