@@ -48,6 +48,9 @@ async def _get_status(site: str, host: str):
 async def check(request):
     domain = request.match_info['domain']
     servers = (
+        '172.18.0.203',    # O2O1
+        '172.18.17.71',    # O2O2
+        '172.18.61.67',    # Boss
         '172.18.17.70',    # 0204
         '172.18.17.72',    # O2O5
         '172.18.17.69',    # O2O8
