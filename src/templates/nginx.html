@@ -169,11 +169,13 @@ function appendToDiv(div, servers, type){
     div.append("<h4>在线中服务器列表: </h4>");
   };
   for (var i = 0;i < servers.length; i++){
-    var _server_ip = servers[i];
+    // _server is IP:Port
+    var _server = servers[i];
+    var _server_ip = _server.split(":")[0];
     var _server_name = SERVERS[_server_ip];
     var _context = `
       <li style="color:${color}">
-        <input name="servers-${type}" type="checkbox" value="${_server_ip}">${_server_ip}&nbsp;&nbsp;${_server_name}</input>
+        <input name="servers-${type}" type="checkbox" value="${_server}">${_server}&nbsp;&nbsp;${_server_name}</input>
       </li>
     `;
     div.append(_context);
