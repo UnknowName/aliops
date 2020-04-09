@@ -50,6 +50,32 @@
     </div>
   </body>
 <script>
+// 主机IP与主机名对应关系
+var SERVERS = servers = {
+        "172.18.0.203": "O2O1",
+        "172.18.17.71": "O2O2",
+        "172.18.61.67": "BossDB",
+        "172.18.17.70": "O2O4",
+        "172.18.17.72": "O2O5",
+        "172.18.17.69": "O2O8",
+        "172.18.17.64": "O2O10",
+        "172.18.17.67": "O2O11",
+        "172.18.17.66": "O2O13",
+        "172.18.17.63": "O2O14",
+        "172.18.17.79": "O2O15",
+        "172.18.17.78": "O2O16",
+        "172.18.0.205": "O2O17",
+        "172.18.0.204": "O2O18",
+        "172.18.0.206": "O2O19",
+        "172.18.0.208": "O2O20",
+        "172.18.0.213": "O2O21",
+        "172.18.0.212": "O2O22",
+        "172.18.0.217": "O2O23",
+        "172.18.0.216": "O2O24",
+        "172.18.203.241": "O2O25",
+        "172.18.203.243": "O2O26",
+        "172.18.203.244": "O2O27"
+};
 // 当选中相关域名时,动态AJAX请求
 function get_backends(domain) {
     $.ajax({
@@ -143,9 +169,11 @@ function appendToDiv(div, servers, type){
     div.append("<h4>在线中服务器列表: </h4>");
   };
   for (var i = 0;i < servers.length; i++){
+    var _server_ip = servers[i];
+    var _server_name = SERVERS[_server_ip];
     var _context = `
       <li style="color:${color}">
-        <input name="servers-${type}" type="checkbox" value="${servers[i]}">${servers[i]}</input>
+        <input name="servers-${type}" type="checkbox" value="${_server_ip}">${_server_ip}&nbsp;&nbsp;${_server_name}</input>
       </li>
     `;
     div.append(_context);
