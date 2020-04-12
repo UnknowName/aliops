@@ -53,6 +53,7 @@ async def _get_status(site: str, host: str):
         return 504, host
 
 
+# TODO 504状态红色显示
 async def check(request):
     domain = request.match_info['domain']
     servers = SERVERS.get(domain)
@@ -63,10 +64,13 @@ async def check(request):
     all_results = [done.result() for done in dones]
     response = ""
     ok = 0
+    resp_fmt = "<p style='color: {color};margin: 5px auto'>{name}&nbsp;{host}&nbsp; {status}</p>"
     for status, host in all_results:
         if status in [200, 301, 302]:
             ok += 1
-        response += "{name}  {host}  {status}\n".format(host=host, status=status, name=servers.get(host))
-    rate = ok / len(all_results) * 100
-    response += '\nRate: {}%'.format(rate)
-    return web.Response(status=200, text=response)
+            response += resp_fmt.format(color="green", host=host, status=status, name=servers.get(host))
+        else:
+            response += resp_fmt.format(color="red", host=host, status=status, name=servers.get(host))
+    rate = ok / len(servers) * 100
+    response += '<p style="color: green">Rate: {}%</p>'.format(rate)
+    return web.Response(status=200, text=response, content_type="text/html", charset="utf8")
