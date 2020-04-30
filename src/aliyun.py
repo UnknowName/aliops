@@ -5,11 +5,13 @@ import aiohttp_jinja2
 from aiohttp import web
 
 from aliyunsdkcore.client import AcsClient
-from aliyunsdkslb.request.v20140515.SetBackendServersRequest import SetBackendServersRequest
 from aliyunsdkecs.request.v20140526.DescribeInstancesRequest import DescribeInstancesRequest
+from aliyunsdkslb.request.v20140515.SetBackendServersRequest import SetBackendServersRequest
+from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
 from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
 from aliyunsdkalidns.request.v20150109.UpdateDomainRecordRequest import UpdateDomainRecordRequest
 from aliyunsdkalidns.request.v20150109.DescribeDomainRecordsRequest import DescribeDomainRecordsRequest
+
 
 from utils import AppConfig
 
@@ -175,3 +177,24 @@ async def dns_change_ip(request):
         return web.json_response(resp)
     err_resp = dict(msg="error")
     return web.json_response(err_resp)
+
+
+@aiohttp_jinja2.template("acl.html")
+async def slb_add_ip(request):
+    if request.method == 'GET':
+        return {}
+    elif request.method == 'POST':
+        data = await request.post()
+        ip, comment = data.get("ip", ""), data.get("comment", "")
+        if not ip:
+            return web.json_response({"status": "invalid ip"})
+        req = AddAccessControlListEntryRequest()
+        req.set_accept_format('json')
+        req.set_AclId("acl-wz9lkxbst9kk1v57lz3ha")
+        entrys = [{"entry": "{}/32".format(ip), "comment": comment}]
+        req.set_AclEntrys(entrys)
+        try:
+            client.do_action_with_exception(req)
+        except Exception:
+            return web.json_response({"status": "error"})
+        return web.json_response({"status": "success"})

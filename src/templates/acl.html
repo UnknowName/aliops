@@ -1,0 +1,51 @@
+<html>
+    <head>
+        <style>
+            body { font-size: 50px }
+            li { list-style: none; font-size: 160px; margin: 2px auto}
+            input { width: 1020px; height: 150px; font-size: 150px;}
+        </style>
+        <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    </head>
+    <body>
+    <div id="main">
+        <form>
+            <li>IP:   <input type="text" name="ip" size="20"/></li>
+            <li>备注:  <input type="text" name="comment" size="20"/></li>
+            <li><input  style="color: green; width: 400px; height: 300px;"  onclick="addIp()" type="submit"></li>
+        </form>
+    </div>
+    </body>
+    <script>
+        function addIp(data) {
+            var ip = $("input[name='ip']").val();
+            var comment = $("input[name='comment']").val();
+            if (ip == undefined || ip == "") {
+                alert("IP不能为空!");
+                return false;
+            };
+            var exp = /^(?!.*\.$)((?!0\d)(1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/
+            if(ip.match(exp)) {
+                $.ajax({
+                   type: "POST",
+                   url: "acl",
+                   dataType: "json",
+                   data: {
+                      ip: ip,
+                      comment: comment
+                   }
+                }).always(function(data) {
+                    if(data.status == "success") {
+                        alert("添加成功");
+                    }else{
+                        alert("添加失败");
+                    };
+                });
+                return true;
+            }else{
+                alert("IP不合法,请检查确认");
+                return false;
+            };
+        };
+    </script>
+</html>

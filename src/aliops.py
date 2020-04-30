@@ -23,6 +23,8 @@ def main():
         web.get('/slb', aliyun.slb_index),
         web.post('/slb/info', aliyun.get_slb_backends),
         web.get('/slb/change', aliyun.change_slb_backend),
+        web.get('/slb/acl', aliyun.slb_add_ip),
+        web.post('/slb/acl', aliyun.slb_add_ip),
         web.get('/dns', aliyun.dns_index),
         web.post('/dns/get_ip', aliyun.dns_get_ip),
         web.get('/dns/change', aliyun.dns_change_ip),
