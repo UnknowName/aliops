@@ -7,6 +7,10 @@ CONFIG_FILE = "config.yml"
 
 
 class Gateway(object):
+    _server_reg = re.compile(r'(\s+)?(#+)?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
+    _weight_reg = re.compile(r".*weight=(\d{,3}).*")
+    _tag = "W"
+
     def __init__(self, user: str, host: str) -> None:
         self.ssh_user = user
         self.ssh_host = host
@@ -21,13 +25,19 @@ class Gateway(object):
             return True, output
         return False, output
 
-    def _filter_upstream(self, line: str):
-        reg = re.compile(r'(\s+)?(#+)?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
+    def _filter_upstream(self, line: str) -> str:
         try:
             # return is "# server 128.0.255.10:80" or "server 128.0.255.10:80"
-            return reg.match(line).group().strip()
+            return self._server_reg.match(line).group().strip()
         except AttributeError:
             return ""
+
+    def _get_server_weight(self, line: str) -> str:
+        result = self._weight_reg.match(line)
+        if result:
+            return result.group(1)
+        else:
+            return "1"
 
     # 只返回指定端口的服务器，在线/下线状态由客户端JS判断
     def _get_upstream_servers(self, config_file: str) -> (bool, set):
@@ -40,9 +50,9 @@ class Gateway(object):
             for line in stdout.split('\n'):
                 if not line:
                     continue
-                upstream = self._filter_upstream(line)
+                upstream, weight = self._filter_upstream(line), self._get_server_weight(line)
                 if upstream:
-                    all_server.add(upstream)
+                    all_server.add("{}{}{}".format(upstream, self._tag, weight))
             return True, all_server
         err_msg = stdout
         return False, err_msg
@@ -52,7 +62,8 @@ class Gateway(object):
         if ok:
             hosts = set()
             for _upstream in output:
-                _, _port = _upstream.split(":")
+                _server_port, weight = _upstream.split(self._tag)
+                _, _port = _server_port.split(":")
                 if _port == str(port):
                     upstream = _upstream.strip(" ")
                     if upstream.startswith("#"):
@@ -103,9 +114,6 @@ class Gateway(object):
         else:
             return False, _stdout
         return _ok, _stdout
-
-    def check_config(self):
-        return self._execute_cmd("nginx -t")
 
     def _reload_service(self):
         return self._execute_cmd("nginx -t && nginx -s reload")
