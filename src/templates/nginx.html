@@ -2,9 +2,9 @@
 <head>
     <style type="text/css">
       input { height:25px; width:25px; }
+      .weight { height: 40px; width: 55px;}
       li { list-style:none; font-size: 30px;}
       div { float: left; margin: 5px 15px; min-width: 800px; min-height: 10%; font-size: 20px;}
-      .domains     { font-size: 30px; }
       #server-up   { min-width: 10%;}
       #server-down { min-width: 10%;}
     </style>
@@ -44,6 +44,9 @@
         </div>
         <!--上线列表服务器HTML结束-->
       </form>
+      <div id="tips" style="display: none">
+        <p><input type="checkbox" id="weight"/>同时修改权重</p>
+      </div>
       <div>
           <p><input type="submit" onclick="postData()" style="width:80px;height:50px" value="修改"/></p>
       </div>
@@ -54,7 +57,6 @@
 var SERVERS = {
         "172.18.0.203": "O2O1",
         "172.18.17.71": "O2O2",
-        "172.18.61.67": "BossDB",
         "172.18.17.70": "O2O4",
         "172.18.17.72": "O2O5",
         "172.18.17.69": "O2O8",
@@ -62,8 +64,6 @@ var SERVERS = {
         "172.18.17.67": "O2O11",
         "172.18.17.66": "O2O13",
         "172.18.17.63": "O2O14",
-        "172.18.17.79": "O2O15",
-        "172.18.17.78": "O2O16",
         "172.18.0.205": "O2O17",
         "172.18.0.204": "O2O18",
         "172.18.0.206": "O2O19",
@@ -110,6 +110,8 @@ function get_backends(domain) {
         }else{
           alert(`发生错误: ${data.err_msg}`);
         };
+        var info = $("#tips");
+        info.css("display", "block");
     });
 };
 
@@ -129,7 +131,7 @@ function checkData(){
   // 待上线服务器
   var upData=$("input:checkbox[name=servers-down]:checked");
   // 所有服务器
-  var all=$("input:checkbox");
+  var all=$("input.servers:checkbox");
   if (downData.length == 0 && upData.length == 0) {
       alert("请至少选择一台服务器进行操作!");
       return false;
@@ -138,6 +140,28 @@ function checkData(){
     alert("不能全部同时下线，至少保留一台在线状态！");
     return false;
   };
+  // 检查待下线权重合法性
+  for (var i=0;i < downData.length; i++) {
+    var _server_html = downData[i];
+    var _server = _server_html.value;
+    var _weight = $(`input.weight[name='${_server}']`).val();
+    if (_weight % 1 !== 0 || _weight < 0 || _weight > 100) {
+      alert("权重不合法，范围为0-100的整型数字!");
+      return false;
+    };
+  };
+
+  // 检查待上线权重合法性
+  for (var i = 0; i < upData.length; i++) {
+    var _server_html = upData[i];
+    var _server = _server_html.value;
+    var _weight = $(`input.weight[name='${_server}']`).val();
+    if (_weight % 1 !== 0 || _weight < 0 || _weight > 100) {
+      alert("权重不合法，范围为0-100的整型数字!");
+      return false;
+    };
+  };
+
   return true;
 };
 
@@ -172,28 +196,49 @@ function appendToDiv(div, servers, type){
     div.append("<h4>在线中服务器列表: </h4>");
   };
   for (var i = 0;i < servers.length; i++){
-    // _server is IP:Port
+    // _server is like 128.0.255.10w1
     var _server = servers[i];
-    var _server_ip = _server.split(":")[0];
+    var _server_full = _server.split("W")[0]
+    var _server_weight = _server.split("W")[1]
+    var _server_ip = _server_full.split(":")[0];
     var _server_name = SERVERS[_server_ip];
-    var _context = `
+
+    if (_server_name == undefined) {
+      var htmlContent = `${_server_full}&nbsp;`
+    } else {
+      var htmlContent = `${_server_full}&nbsp;&nbsp;${_server_name}&nbsp;&nbsp;weight: ${_server_weight}`
+    };
+
+    var liHtml = `
       <li style="color:${color}">
-        <input name="servers-${type}" type="checkbox" value="${_server}">${_server}&nbsp;&nbsp;${_server_name}</input>
+        <input class="servers" name="servers-${type}" type="checkbox" value="${_server_full}">${htmlContent}</input>
+        Weight:&nbsp;<input class="weight" name="${_server_full}" type="text" value="${_server_weight}"></input>
       </li>
     `;
-    div.append(_context);
+    div.append(liHtml);
   };
+
   // 增加尾部信息
   if (type == "down" && servers.length != 0){
-    div.append(`<p class="server-list">操作类型: <input type="radio" name="up-action" checked>上线</input></p>`);
+    var name = "up-action";
+    var display = "上线";
   }else if (type == "up" && servers.length !=0 ){
-    div.append(`<p class="server-list">操作类型: <input type="radio" name="down-action" checked>下线</input></p>`);
+    var name = "down-action";
+    var display = "下线";
   };
+  var divContext = `
+      <p class="server-list">操作类型:
+        <input type="radio" name="${name}" checked>${display}</input>
+      </p>
+  `
+  div.append(divContext);
 };
 
+/*
 function sleep(d){
   for(var t = Date.now();Date.now() - t <= d;);
 };
+*/
 
 function getFormObj(formId) {
     var formObj = {};
@@ -214,22 +259,32 @@ function postData() {
     var _domain = $("input:radio[name=domain]:checked").val();
     var _downServers = new Array();
     var _upServers = new Array();
+    var is_weight = $("input:checkbox[id='weight']").is(":checked");
+
     $("input:checkbox[name=servers-down]:checked").each(function(){
-      _downServers.push($(this).val());
+      var _server = $(this).val();
+      var _weight = $(`input:text[name='${_server}']`).val();
+      _downServers.push(`${_server}W${_weight}`);
     });
+
     $("input:checkbox[name=servers-up]:checked").each(function(){
-      _upServers.push($(this).val());
+      var _server = $(this).val();
+      var _weight = $(`input:text[name='${_server}']`).val();
+      _upServers.push(`${_server}W${_weight}`);
     });
+
     if (_downServers.length == 0){
       _downServer = "";
     }else{
       _downServer = _downServers.join(",");
     };
+
     if (_upServers.length == 0){
       _upServer = "";
     }else{
       _upServer = _upServers.join(",");
     };
+
     $.ajax({
       type: "POST",
       url: "nginx",
@@ -238,6 +293,7 @@ function postData() {
           domain: _domain,
           down_servers: _downServer,
           up_servers: _upServer,
+          change_weight: is_weight,
       }
     }).always(function (respData) {
       alert(respData.msg);
