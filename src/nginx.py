@@ -44,17 +44,19 @@ async def change_upstream(request):
         return {'domains': domains}
     elif request.method == "POST":
         data = await request.post()
-        domain, action = data.get("domain"), data.get("action")
+        domain, down_option, up_option = data.get("domain"), data.get("down_option", ""), data.get("up_option", "")
         nginx_user, nginxs = config.get_domain_nginxs(domain)
         config_file = config.get_domain(domain).get("config_file", "")
         if not config_file:
             logger.error("Domain NGINX config file path not set!")
             return web.json_response(dict(status=500, msg="配置文件有误,请联系管理员修正"))
         up_servers, down_servers = data.get("up_servers", "").split(","), data.get("down_servers", "").split(",")
-        upstream_dic = dict(down_servers=down_servers, up_servers=up_servers)
+        upstream_dic = dict(up_servers=up_servers, down_servers=down_servers)
+        operation_dic = dict(down=down_option, up=up_option)
         logger.info("Servers is : {0}".format(upstream_dic))
         outputs = [
-            Gateway(nginx_user, host).set_upstream_status(upstream_dic, config_file)
+            # Gateway(nginx_user, host).set_upstream_status(upstream_dic, config_file)
+            Gateway(nginx_user, host).set_upstream_with_weight(upstream_dic, operation_dic, config_file)
             for host in nginxs
         ]
         if all([success[0] for success in outputs]):

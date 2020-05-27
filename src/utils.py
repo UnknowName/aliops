@@ -39,10 +39,53 @@ class Gateway(object):
         else:
             return "1"
 
+    def fmt_down_servers(self, servers: list, operation: str, config_file: str):
+        if not servers:
+            return ""
+        else:
+            _cmds = list()
+            if operation == "down":
+                _fmt = r'sed --follow-symlinks -ri "s/(\s+?server\s+?\b{host}\b.*)/#\1/g" {filename}'
+            elif operation == "down-weight":
+                _fmt = r'sed --follow-symlinks -ri "s/(\s+?server\s+?\b{host}\b.*)/{server}/g" {filename}'
+            else:
+                return ""
+            for server_with_weight in servers:
+                if server_with_weight == "":
+                    continue
+                _server, _weight = server_with_weight.split(self._tag)
+                server = "server {} weight={};".format(_server, _weight)
+                _cmds.append(_fmt.format(host=_server, server=server, filename=config_file))
+            return "&&".join(_cmds)
+
+    def fmt_up_servers(self, servers: list, operation: str, config_file: str):
+        if not servers:
+            return ""
+        else:
+            _cmds = list()
+            if operation == "up,up-weight":
+                # print("已下线机器修改权重并上线")
+                _fmt = r'sed --follow-symlinks -ri "s/(#+?\s+?server\s+?\b{host}\b.*)/{server}/g" {filename}'
+            elif operation == "up":
+                # print("已下线机器只上线")
+                _fmt = r'sed --follow-symlinks -ri "s/#+?\s+?(\s+?server\s+?\b{host}\b.*)/\1/g" {filename}'
+            elif operation == "up-weight":
+                # print("已下线机器只修改权重")
+                _fmt = r'sed --follow-symlinks -ri "s/(\s+?server\s+?\b{host}\b.*)/{server}/g" {filename}'
+            else:
+                return ""
+            for server_with_weight in servers:
+                if server_with_weight == "":
+                    continue
+                _server, _weight = server_with_weight.split(self._tag)
+                server = "server {} weight={};".format(_server, _weight)
+                _cmds.append(_fmt.format(host=_server, server=server, filename=config_file))
+            return "&&".join(_cmds)
+
     # 只返回指定端口的服务器，在线/下线状态由客户端JS判断
     def _get_upstream_servers(self, config_file: str) -> (bool, set):
         """返回Set类型，后续的检查相等函数用得上"""
-        cmd_fmt = r"""grep -E "\s+#+?\bserver\b\s+.*;" {config_file}"""
+        cmd_fmt = r"""grep -E "\s+?#+?\bserver\b\s+.*;" {config_file}"""
         command = cmd_fmt.format(user=self.ssh_user, host=self.ssh_host, config_file=config_file)
         ok, stdout = self._execute_cmd(command)
         if ok and stdout:
@@ -67,10 +110,32 @@ class Gateway(object):
                 if _port == str(port):
                     upstream = _upstream.strip(" ")
                     if upstream.startswith("#"):
-                        upstream = re.sub(r'#\s+', '#', _upstream)
+                        upstream = re.sub(r'#+', '#', _upstream)
+                        upstream = re.sub(r'#\s+', '#', upstream)
                     hosts.add(upstream)
             return True, hosts
         return False, output
+
+    def set_upstream_with_weight(self, upstream: dict, operation: dict, config_path: str):
+        down_server_cmds = self.fmt_down_servers(upstream.get("down_servers"), operation.get("down", ""), config_path)
+        up_server_cmds = self.fmt_up_servers(upstream.get("up_servers"), operation.get("up", ""), config_path)
+        if down_server_cmds and up_server_cmds:
+            all_cmds = "{}&&{}".format(down_server_cmds, up_server_cmds)
+        elif down_server_cmds and not up_server_cmds:
+            all_cmds = down_server_cmds
+        elif up_server_cmds and not down_server_cmds:
+            all_cmds = up_server_cmds
+        else:
+            all_cmds = ""
+        print("*" * 20)
+        print(all_cmds)
+        print("*" * 20)
+        _ok, _stdout = self._execute_cmd(all_cmds)
+        if _ok:
+            _ok, _stdout = self._reload_service()
+        else:
+            return False, _stdout
+        return _ok, _stdout
 
     def set_upstreams_status(self, upstreams: list, status: str, config_path: str):
         cmd_fmt = r'sed --follow-symlinks -ri "s/{status}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
@@ -178,17 +243,17 @@ def check_equal(data: list) -> tuple:
 
 if __name__ == "__main__":
     """
-    import asyncio
-
-    loop = asyncio.get_event_loop()
-    server = "128.0.100.171"
-    domain = "dev.siss.io_18911"
-    k8s_host = "128.0.255.7"
-    cmd = gener_cmd("up", k8s_host, "/etc/nginx/conf.d/dev.siss.io.conf")
-    task = loop.create_task(run_remote_cmd('root', server, cmd))
-    loop.run_until_complete(task)
-    loop.close()
-    """
     test_domain = "dev.siss.io"
     config = AppConfig("config.yml")
     print(config.get_domain("dev.siss.io"))
+    """
+    user = "user"
+    host = "128.0.255.10"
+    g = Gateway(user, host)
+    # servers = ["128.0.255.29:8080W20"]
+    down_servers = ["128.0.255.27:8080W20"]
+    up_servers = ['']
+    op = dict(up="up", down="down")
+    test_servers = dict(up_servers=up_servers, down_servers=down_servers)
+    g.set_upstream_with_weight(test_servers, op, "test.conf")
+

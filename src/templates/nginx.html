@@ -44,9 +44,11 @@
         </div>
         <!--上线列表服务器HTML结束-->
       </form>
+      <!--
       <div id="tips" style="display: none">
         <p><input type="checkbox" id="weight"/>同时修改权重</p>
       </div>
+      -->
       <div>
           <p><input type="submit" onclick="postData()" style="width:80px;height:50px" value="修改"/></p>
       </div>
@@ -130,13 +132,15 @@ function checkData(){
   var upServers=$("input:checkbox[name=servers-up]");
   // 待上线服务器
   var upData=$("input:checkbox[name=servers-down]:checked");
+  // 对已上线服务器的操作
+  var option = $("p.server-list input:radio:checked").val()
   // 所有服务器
   var all=$("input.servers:checkbox");
   if (downData.length == 0 && upData.length == 0) {
       alert("请至少选择一台服务器进行操作!");
       return false;
   };
-  if ((downServers.length + downData.length) == all.length) {
+  if ((downServers.length + downData.length) == all.length && option == "down") {
     alert("不能全部同时下线，至少保留一台在线状态！");
     return false;
   };
@@ -145,8 +149,9 @@ function checkData(){
     var _server_html = downData[i];
     var _server = _server_html.value;
     var _weight = $(`input.weight[name='${_server}']`).val();
-    if (_weight % 1 !== 0 || _weight < 0 || _weight > 100) {
-      alert("权重不合法，范围为0-100的整型数字!");
+    var _weight = parseInt(_weight);
+    if (_weight % 1 !== 0 || _weight <= 0 || _weight > 100) {
+      alert("权重不合法，范围为1-100的整型数字!");
       return false;
     };
   };
@@ -156,12 +161,12 @@ function checkData(){
     var _server_html = upData[i];
     var _server = _server_html.value;
     var _weight = $(`input.weight[name='${_server}']`).val();
-    if (_weight % 1 !== 0 || _weight < 0 || _weight > 100) {
-      alert("权重不合法，范围为0-100的整型数字!");
+    var _weight = parseInt(_weight);
+    if (_weight % 1 !== 0 || _weight <= 0 || _weight > 100) {
+      alert("权重不合法，范围为1-100的整型数字!");
       return false;
     };
   };
-
   return true;
 };
 
@@ -220,15 +225,18 @@ function appendToDiv(div, servers, type){
 
   // 增加尾部信息
   if (type == "down" && servers.length != 0){
-    var name = "up-action";
+    var name = "up";
     var display = "上线";
+    var inputType = "checkbox";
   }else if (type == "up" && servers.length !=0 ){
-    var name = "down-action";
+    var name = "down";
     var display = "下线";
+    var inputType = "radio";
   };
   var divContext = `
       <p class="server-list">操作类型:
-        <input type="radio" name="${name}" checked>${display}</input>
+        <input type="${inputType}" name="${name}" value="${name}" checked>${display}</input>
+        <input type="${inputType}" name="${name}" value="${name}-weight">修改权重</input>
       </p>
   `
   div.append(divContext);
@@ -259,8 +267,13 @@ function postData() {
     var _domain = $("input:radio[name=domain]:checked").val();
     var _downServers = new Array();
     var _upServers = new Array();
-    var is_weight = $("input:checkbox[id='weight']").is(":checked");
-
+    var down_options = new Array();
+    var option = $("p.server-list input:checked");
+    var down_option = $("p.server-list input:checkbox:checked")
+    for (var i=0; i < down_option.length; i++){
+      down_options.push(option[i].value);
+    };
+    var up_option = $("p.server-list input:radio:checked").val()
     $("input:checkbox[name=servers-down]:checked").each(function(){
       var _server = $(this).val();
       var _weight = $(`input:text[name='${_server}']`).val();
@@ -291,9 +304,10 @@ function postData() {
       dataType: "json",
       data: {
           domain: _domain,
-          down_servers: _downServer,
-          up_servers: _upServer,
-          change_weight: is_weight,
+          down_servers: _upServer,
+          up_servers: _downServer,
+          up_option: down_options.join(","),
+          down_option: up_option,
       }
     }).always(function (respData) {
       alert(respData.msg);
