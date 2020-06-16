@@ -235,8 +235,13 @@ class AppConfig(object):
 
 def check_equal(data: list) -> tuple:
     def _check(x, y):
-        if x == y:
-            return x
+        if isinstance(x, bool):
+            return False
+        if x[0] == y[0]:
+            _x = (elem.replace(" ", "") for elem in x[1])
+            _y = (elem.replace(" ", "") for elem in y[1])
+            if tuple(_x) == tuple(_y):
+                return x
         return False
     return reduce(_check, data)
 
