@@ -238,9 +238,9 @@ def check_equal(data: list) -> tuple:
         if isinstance(x, bool):
             return False
         if x[0] == y[0]:
-            _x = (elem.replace(" ", "") for elem in x[1])
-            _y = (elem.replace(" ", "") for elem in y[1])
-            if tuple(_x) == tuple(_y):
+            _x = {elem.replace(" ", "") for elem in x[1]}
+            _y = {elem.replace(" ", "") for elem in y[1]}
+            if _x == _y:
                 return x
         return False
     return reduce(_check, data)
@@ -251,14 +251,13 @@ if __name__ == "__main__":
     test_domain = "dev.siss.io"
     config = AppConfig("config.yml")
     print(config.get_domain("dev.siss.io"))
-    """
     user = "user"
     host = "128.0.255.10"
     g = Gateway(user, host)
+    """
     # servers = ["128.0.255.29:8080W20"]
     down_servers = ["128.0.255.27:8080W20"]
     up_servers = ['']
     op = dict(up="up", down="down")
     test_servers = dict(up_servers=up_servers, down_servers=down_servers)
     g.set_upstream_with_weight(test_servers, op, "test.conf")
-
