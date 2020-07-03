@@ -7,12 +7,13 @@ from aiohttp import web
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkecs.request.v20140526.DescribeInstancesRequest import DescribeInstancesRequest
 from aliyunsdkslb.request.v20140515.SetBackendServersRequest import SetBackendServersRequest
-from aliyunsdkslb.request.v20140515.DescribeVServerGroupsRequest import DescribeVServerGroupsRequest
-from aliyunsdkslb.request.v20140515.DescribeVServerGroupAttributeRequest import DescribeVServerGroupAttributeRequest
-from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
-from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
 from aliyunsdkalidns.request.v20150109.UpdateDomainRecordRequest import UpdateDomainRecordRequest
 from aliyunsdkalidns.request.v20150109.DescribeDomainRecordsRequest import DescribeDomainRecordsRequest
+from aliyunsdkslb.request.v20140515.DescribeVServerGroupsRequest import DescribeVServerGroupsRequest
+from aliyunsdkslb.request.v20140515.SetVServerGroupAttributeRequest import SetVServerGroupAttributeRequest
+from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
+from aliyunsdkslb.request.v20140515.DescribeVServerGroupAttributeRequest import DescribeVServerGroupAttributeRequest
+from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
 
 
 from utils import AppConfig
@@ -68,6 +69,7 @@ async def get_slb_backends(request):
         req_response = json.loads(client.do_action_with_exception(req).decode("utf8"))
         resp["name"] = req_response.get("LoadBalancerName")
         resp["ip"] = req_response.get("Address")
+        virtual_id = ""
         if virtual_name != "None":
             # 有虚拟组，获取虚拟组中的机器
             req = DescribeVServerGroupsRequest()
@@ -115,6 +117,8 @@ async def get_slb_backends(request):
             public_ips = instance.get("PublicIpAddress").get("IpAddress")
             if public_ips:
                 item['public_ip'] = public_ips[0]
+            if virtual_id:
+                item['virtual_id'] = virtual_id
             _results.append(item)
         resp["servers"] = _results
         return web.json_response(resp)
@@ -122,22 +126,41 @@ async def get_slb_backends(request):
         return web.Response(status=405)
 
 
-# 这个方法稍后也要修改
 async def change_slb_backend(request):
     ecs_id = request.query.get("ecsId")
-    slb_id = request.query.get("slbId")
+    slb_with_virtual = request.query.get("slbId")
+    slb_id, virtual_name = slb_with_virtual.split("/")
     action = request.query.get("action")
     if action == "online":
         weight = 100
     elif action == "offline":
         weight = 0
     else:
-        return web.Response(status=500, text="error")
-    req = SetBackendServersRequest()
-    req.set_accept_format('json')
-    req.set_LoadBalancerId(slb_id)
-    data = dict(ServerId=ecs_id, weight=weight)
-    req.set_BackendServers([data])
+        return web.Response(status=500, text="不支持的操作")
+    if virtual_name == "None":
+        req = SetBackendServersRequest()
+        req.set_accept_format('json')
+        req.set_LoadBalancerId(slb_id)
+        data = dict(ServerId=ecs_id, weight=weight)
+        req.set_BackendServers([data])
+    else:
+        virtual_id = request.query.get("virtual_id")
+        req = DescribeVServerGroupAttributeRequest()
+        req.set_accept_format("json")
+        req.set_VServerGroupId(virtual_id)
+        backends = list()
+        try:
+            req_response = json.loads(client.do_action_with_exception(req).decode("utf8"))
+            for backend in req_response.get("BackendServers", {}).get("BackendServer"):
+                if backend.get("ServerId") == ecs_id:
+                    backend["Weight"] = weight
+                backends.append(backend)
+            req = SetVServerGroupAttributeRequest()
+            req.set_accept_format("json")
+            req.set_VServerGroupId(virtual_id)
+            req.set_BackendServers(backends)
+        except Exception as e:
+            return web.json_response(status=500, text=str(e))
     try:
         response = client.do_action_with_exception(req)
         print("对SLB{}服务器{}执行{}操作".format(slb_id, ecs_id, action))

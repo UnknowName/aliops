@@ -61,6 +61,7 @@ function getSlbInfo(slb_id) {
           var serverName = backendServers[i].name;
           var serverInnerIP = backendServers[i].private_ip;
           var serverPublicIP = backendServers[i].public_ip;
+          var serverGroupId = backendServers[i].virtual_id;
           if (typeof serverPublicIP == "undefined") {
             var serverPublicIP = "无";
           };
@@ -77,8 +78,8 @@ function getSlbInfo(slb_id) {
               <p>ECS名称:   ${serverName}</p>
               <p>ECS内网IP: ${serverInnerIP}</p>
               <p>ECS外网IP: ${serverPublicIP}&nbsp;&nbsp;${notice}</p>
-              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'offline')">下线</button>
-              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'online')">上线</button>
+              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'offline', '${serverGroupId}')">下线</button>
+              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'online', '${serverGroupId}')">上线</button>
             </li>
           `;
           slb.append(html);
@@ -89,10 +90,10 @@ function getSlbInfo(slb_id) {
 
 //对指定SLB的指定ECS执行上下线操作（将权重设置为0/100）
 //action为online/offline两种选项
-function changeServerStatus(ecsId, slbId, action) {
+function changeServerStatus(ecsId, slbId, action, virtual_id) {
     $.ajax({
       type: "GET",
-      url: `slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}`,
+      url: `slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}&virtual_id=${virtual_id}`,
       dataType: "json",
     }).always(function (response) {
         if (response.status == undefined) {
