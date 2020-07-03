@@ -7,6 +7,8 @@ from aiohttp import web
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkecs.request.v20140526.DescribeInstancesRequest import DescribeInstancesRequest
 from aliyunsdkslb.request.v20140515.SetBackendServersRequest import SetBackendServersRequest
+from aliyunsdkslb.request.v20140515.DescribeVServerGroupsRequest import DescribeVServerGroupsRequest
+from aliyunsdkslb.request.v20140515.DescribeVServerGroupAttributeRequest import DescribeVServerGroupAttributeRequest
 from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
 from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
 from aliyunsdkalidns.request.v20150109.UpdateDomainRecordRequest import UpdateDomainRecordRequest
@@ -36,6 +38,7 @@ async def slb_index(request):
         for domain in slb_domains:
             _domain = domain.split("_")[0]
             domain_dic = config.get_domain(domain)
+            virtual_name = domain_dic.get("slb_virtual_name")
             domain_slbs = domain_dic.get("slbs")
             domain_addr = socket.getaddrinfo(_domain, None)[0][4][0]
             req.set_accept_format('json')
@@ -46,7 +49,7 @@ async def slb_index(request):
                 req_resp = json.loads(client.do_action_with_exception(req).decode("utf8"))
                 slb_addr = req_resp.get("Address", "")
                 if domain_addr == slb_addr:
-                    current_slbs.append(slb)
+                    current_slbs.append("{}/{}".format(slb, virtual_name))
             resp = {domain: current_slbs}
             responses.append(resp)
         return dict(domains=responses)
@@ -57,15 +60,37 @@ async def get_slb_backends(request):
         # 返回给用户的Response
         resp = dict()
         data = await request.post()
+        slb_id, virtual_name = data.get("slb_id", "").split("/")
+        # 获取SLB的基本信息，主要是名称，外网IP
         req = DescribeLoadBalancerAttributeRequest()
         req.set_accept_format('json')
-        req.set_LoadBalancerId(data.get("slb_id", ""))
-        response = json.loads(client.do_action_with_exception(req).decode("utf8"))
-        resp["name"] = response.get("LoadBalancerName")
-        resp["ip"] = response.get("Address")
-        default_backends = response.get("BackendServers").get("BackendServer")
+        req.set_LoadBalancerId(slb_id)
+        req_response = json.loads(client.do_action_with_exception(req).decode("utf8"))
+        resp["name"] = req_response.get("LoadBalancerName")
+        resp["ip"] = req_response.get("Address")
+        if virtual_name != "None":
+            # 有虚拟组，获取虚拟组中的机器
+            req = DescribeVServerGroupsRequest()
+            req.set_accept_format("json")
+            req.set_LoadBalancerId(slb_id)
+            try:
+                req_resp = json.loads(client.do_action_with_exception(req).decode("utf8"))
+                for vgroup in req_resp.get("VServerGroups").get("VServerGroup"):
+                    if vgroup.get("VServerGroupName") == virtual_name:
+                        virtual_id = vgroup.get("VServerGroupId")
+                        # 通过虚拟组ID获取后端服务器信息
+                        req = DescribeVServerGroupAttributeRequest()
+                        req.set_accept_format("json")
+                        req.set_VServerGroupId(virtual_id)
+                        req_response = json.loads(client.do_action_with_exception(req).decode("utf8"))
+                        break
+            except Exception as e:
+                return web.json_response(status=500, text=str(e))
+        backends = req_response.get("BackendServers", {}).get("BackendServer")
+        if not backends:
+            return web.json_response(status=500, text="No Servers")
         # Key为ECS ID, Value为权重
-        backend_dic = {k.get("ServerId"): k.get("Weight") for k in default_backends}
+        backend_dic = {k.get("ServerId"): k.get("Weight") for k in backends}
         # 先获取SLB默认后端的ECS的ID，SLB只提供该API
         ecs_ids = [ecs_id for ecs_id in backend_dic]
         # 拿到ECS ID后，再获取该ECS详细信息，最终返回给页面渲染
@@ -86,8 +111,10 @@ async def get_slb_backends(request):
             else:
                 item['private_ip'] = instance.get("NetworkInterfaces").get("NetworkInterface")[0].get(
                     "PrimaryIpAddress")
-            item['public_ip'] = instance.get("PublicIpAddress").get("IpAddress")[0]
             item['weight'] = backend_dic.get(item["id"])
+            public_ips = instance.get("PublicIpAddress").get("IpAddress")
+            if public_ips:
+                item['public_ip'] = public_ips[0]
             _results.append(item)
         resp["servers"] = _results
         return web.json_response(resp)
@@ -95,6 +122,7 @@ async def get_slb_backends(request):
         return web.Response(status=405)
 
 
+# 这个方法稍后也要修改
 async def change_slb_backend(request):
     ecs_id = request.query.get("ecsId")
     slb_id = request.query.get("slbId")
@@ -115,8 +143,7 @@ async def change_slb_backend(request):
         print("对SLB{}服务器{}执行{}操作".format(slb_id, ecs_id, action))
         return web.Response(status=200, text=response.decode("utf8"))
     except Exception as e:
-        print(e)
-        return web.Response(status=500, text="error")
+        return web.Response(status=500, text=str(e))
 
 
 @aiohttp_jinja2.template("dns.html")
