@@ -19,8 +19,8 @@
         {% for domain, slbs in  dic.items() %}
             <p>{{ domain }}</p>
             <ul>
-                {% for slb in slbs %}
-                <li><input type="radio" name="slb" value="{{ slb }}"/>{{ slb }}</li>
+                {% for slb_with_virtual in slbs %}
+                <li><input type="radio" name="slb" value="{{ slb_with_virtual }}"/>{{ slb_with_virtual.split("/")[0] }}</li>
                 {% endfor %}
             </ul>
         {% endfor %}
@@ -61,6 +61,9 @@ function getSlbInfo(slb_id) {
           var serverName = backendServers[i].name;
           var serverInnerIP = backendServers[i].private_ip;
           var serverPublicIP = backendServers[i].public_ip;
+          if (typeof serverPublicIP == "undefined") {
+            var serverPublicIP = "无";
+          };
           var serverWeight = backendServers[i].weight;
           if (serverWeight == 0) {
             var color = "red";
