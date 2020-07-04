@@ -195,7 +195,7 @@ class AppConfig(object):
 
     def __init__(self, config_path: str = "") -> None:
         _config_file = config_path if config_path else CONFIG_FILE
-        with open(_config_file) as f:
+        with open(_config_file, encoding="utf8") as f:
             conf_dict = yaml.safe_load(f)
         self._config_dic = conf_dict
 
