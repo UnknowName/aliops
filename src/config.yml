@@ -1,36 +1,37 @@
 domains:
-  - www.unknowname.win_18912:
+  - test.unknowname.win_18912:
       # for change dns record
-      domain: unknowname.win
+      # domain: unknowname.win
       # for nginx
-      nginx:
-        ssh_user: username
-        hosts:
-          - 128.0.255.2
-          - 128.0.255.3
+      #nginx:
+        #ssh_user: username
+        #hosts:
+          #- 128.0.255.2
+          #- 128.0.255.3
       # in NGINX config file.the upstream server's port
       # exits the backend_port,the domain will display on /nginx URL
       backend_port: 8080
       config_file: /etc/nginx/conf.d/dev.siss.io.conf
+      # if not present,Use default backends
+      slb_virtual_name: 测试中文
       slbs:
         # No set, will no display on /slb url
-        # - lb-wz9d9j05rzlyok300fcf4
-        # - lb-wz9obyqmiidllwulomjxh
+        - lb-wz9obyqmiidllwulomjxh
       ips:
         # No set,  will no display on /dns url
         - 120.77.199.116
 
-  - www.unknowname.win_10050:
+  - test.unknowname.win_10050:
       # for change dns record
       domain: unknowname.win
       # for nginx
       config_file: /etc/nginx/conf.d/www.unknowname.win.conf
       backend_port: 80
       slbs:
-        - lb-wz9d9j05rzlyok300fcf4 #Jumpserver
         - lb-wz9obyqmiidllwulomjxh #test
       ips:
         - 128.0.255.10
+
 # Global NGINX.if domains section no nginx present,use here
 nginx:
   ssh_user: username

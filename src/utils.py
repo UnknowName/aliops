@@ -127,9 +127,7 @@ class Gateway(object):
             all_cmds = up_server_cmds
         else:
             all_cmds = ""
-        print("*" * 20)
-        print(all_cmds)
-        print("*" * 20)
+        # print(all_cmds)
         _ok, _stdout = self._execute_cmd(all_cmds)
         if _ok:
             _ok, _stdout = self._reload_service()
