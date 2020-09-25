@@ -3,7 +3,7 @@ import logging
 import aiohttp_jinja2
 from aiohttp import web
 
-from utils import AppConfig, Gateway, check_equal
+from utils import AppConfig, Gateway, check_equal, GatewayNGINX
 
 log_fmt = "%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s"
 logging.basicConfig(level=logging.INFO, format=log_fmt)
@@ -18,7 +18,7 @@ async def get_domain_attrs(request):
     config_file = config.get_domain(domain).get("config_file", "")
     backend_port = config.get_domain(domain).get("backend_port")
     all_servers = [
-        Gateway(nginx_user, host).get_domain_servers(config_file, backend_port)
+        GatewayNGINX(nginx_user, host).get_servers(config_file, backend_port)
         for host in nginxs
     ]
     if not check_equal(all_servers):
@@ -55,7 +55,6 @@ async def change_upstream(request):
         operation_dic = dict(down=down_option, up=up_option)
         logger.info("Servers is : {0}".format(upstream_dic))
         outputs = [
-            # Gateway(nginx_user, host).set_upstream_status(upstream_dic, config_file)
             Gateway(nginx_user, host).set_upstream_with_weight(upstream_dic, operation_dic, config_file)
             for host in nginxs
         ]

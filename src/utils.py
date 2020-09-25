@@ -1,11 +1,12 @@
 import re
 import yaml
 from functools import reduce
-from subprocess import run, PIPE, STDOUT
+from subprocess import run, PIPE, STDOUT, TimeoutExpired
 
 CONFIG_FILE = "config.yml"
 
 
+# TODO 优化替换与设置权重的方法，以保持NGINX中的原格式
 class Gateway(object):
     _server_reg = re.compile(r'(\s+)?(#+)?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
     _weight_reg = re.compile(r".*weight=(\d{,3}).*")
@@ -20,7 +21,7 @@ class Gateway(object):
             user=self.ssh_user, host=self.ssh_host, command=command
         )
         cmd_obj = run(_cmd, shell=True, stdout=PIPE, stderr=STDOUT)
-        output = cmd_obj.stdout.decode("utf8")
+        output = cmd_obj.stdout.decode("utf8", errors="ignore")
         if cmd_obj.returncode == 0:
             return True, output
         return False, output
@@ -86,6 +87,7 @@ class Gateway(object):
     def _get_upstream_servers(self, config_file: str) -> (bool, set):
         """返回Set类型，后续的检查相等函数用得上"""
         cmd_fmt = r"""grep -E "\s+?#+?\bserver\b\s+.*;" {config_file}"""
+        # cmd_fmt = r"""sed -rn "s/.*\bserver\b(.*\b:{port}\b).*/\1/p;" {config_file}"""
         command = cmd_fmt.format(user=self.ssh_user, host=self.ssh_host, config_file=config_file)
         ok, stdout = self._execute_cmd(command)
         if ok and stdout:
@@ -127,7 +129,6 @@ class Gateway(object):
             all_cmds = up_server_cmds
         else:
             all_cmds = ""
-        # print(all_cmds)
         _ok, _stdout = self._execute_cmd(all_cmds)
         if _ok:
             _ok, _stdout = self._reload_service()
@@ -180,6 +181,80 @@ class Gateway(object):
 
     def _reload_service(self):
         return self._execute_cmd("nginx -t && nginx -s reload")
+
+
+class CommandError(Exception):
+    def __init__(self, msg: str):
+        raise Exception(msg)
+
+
+class _BackendServer(object):
+    _weight_reg = re.compile(r".*weight=(\d{,3}).*")
+
+    # 初始化传入NGINX的upstream里面的一条记录;如 server 128.0.0.10:80 weight=10, max_failed=10;
+    def __init__(self, upstream_item: str):
+        _result = self._weight_reg.match(upstream_item)
+        self.weight = _result.group(1) if _result else "1"
+        if upstream_item[0] == "#":
+            self.is_offline = True
+            _, _host, *_others = upstream_item[1:].split()
+        else:
+            self.is_offline = False
+            _, _host, *_others = upstream_item.split()
+        self.host = _host
+        self.others = "".join([attr for attr in _others if not attr.startswith("weight")])
+
+    # 格式化成NGINX标准的upstream中的样式，如: server 128.0.0.10:80 weight=10 max_failed=3;
+    def format(self) -> str:
+        if self.is_offline:
+            return "#server {} weight={} {};".format(self.host, self.weight, self.others)
+        return "server {} weight={} {};".format(self.host, self.weight, self.others)
+
+    # 兼容之前的接口
+    def string(self) -> str:
+        _fmt = "#server {}W{}" if self.is_offline else "server {}W{}"
+        return _fmt.format(self.host, self.weight)
+
+    def __repr__(self) -> str:
+        _fmt = "#server {}W{}" if self.is_offline else "server {}W{}"
+        return _fmt.format(self.host, self.weight)
+
+
+class GatewayNGINX(object):
+    _filter_fmt = r"""sed -rn "s/(#?.*\bserver\b.*\b:{port}\b.*).*;/\1/p" {config_file}"""
+    _cmd_fmt = "ssh root@{host} '{command}'"
+
+    def __init__(self, user: str, host: str):
+        self._user = user
+        self._host = host
+
+    def _execute(self, cmd: str) -> str:
+        _command = self._cmd_fmt.format(host=self._host, command=cmd)
+        try:
+            std = run(_command, shell=True, timeout=5, stdout=PIPE, stderr=PIPE)
+            stdout = std.stdout.decode("utf8", errors="ignore")
+            if std.returncode and std.stderr:
+                err_output = std.stderr.decode("utf8", errors="ignore")
+                CommandError(err_output)
+        except CommandError:
+            stdout = ""
+        except TimeoutExpired:
+            stdout = ""
+        return stdout
+
+    # 如果返回的bool为False，说明数据获取失败
+    def get_servers(self, config_file: str, port: str) -> (bool, set):
+        servers = set()
+        cmd = self._filter_fmt.format(config_file=config_file, port=port)
+        _plain_str = self._execute(cmd)
+        if _plain_str == "":
+            return False, servers
+        for line in _plain_str.split("\n"):
+            if not line:
+                continue
+            server = _BackendServer(line.strip())
+            servers.add(server.string())
+        return True, servers
 
 
 class AppConfig(object):
@@ -252,10 +327,16 @@ if __name__ == "__main__":
     user = "user"
     host = "128.0.255.10"
     g = Gateway(user, host)
-    """
     # servers = ["128.0.255.29:8080W20"]
     down_servers = ["128.0.255.27:8080W20"]
     up_servers = ['']
     op = dict(up="up", down="down")
     test_servers = dict(up_servers=up_servers, down_servers=down_servers)
     g.set_upstream_with_weight(test_servers, op, "test.conf")
+    """
+    info = "server 172.16.33.4:80"
+    info2 = "#       server     172.16.202.249:80     max_fails=3 weight=80;"
+    info3 = "server 172.16.202.244:80  weight=10;"
+    serve1 = _BackendServer(info2)
+    print(serve1)
+    print(serve1.format())
