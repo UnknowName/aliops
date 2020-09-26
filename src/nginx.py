@@ -3,7 +3,7 @@ import logging
 import aiohttp_jinja2
 from aiohttp import web
 
-from utils import AppConfig, Gateway, check_equal, GatewayNGINX
+from utils import AppConfig, check_equal, GatewayNGINX
 
 log_fmt = "%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s"
 logging.basicConfig(level=logging.INFO, format=log_fmt)
@@ -42,6 +42,7 @@ async def change_upstream(request):
     if request.method == "GET":
         domains = config.get_all_domains("nginx")
         return {'domains': domains}
+    # TODO 逻辑优化
     elif request.method == "POST":
         data = await request.post()
         domain, down_option, up_option = data.get("domain"), data.get("down_option", ""), data.get("up_option", "")
@@ -55,7 +56,8 @@ async def change_upstream(request):
         operation_dic = dict(down=down_option, up=up_option)
         logger.info("Servers is : {0}".format(upstream_dic))
         outputs = [
-            Gateway(nginx_user, host).set_upstream_with_weight(upstream_dic, operation_dic, config_file)
+            # Gateway(nginx_user, host).set_upstream_with_weight(upstream_dic, operation_dic, config_file)
+            GatewayNGINX(nginx_user, host).change_servers(upstream_dic, operation_dic, config_file)
             for host in nginxs
         ]
         if all([success[0] for success in outputs]):

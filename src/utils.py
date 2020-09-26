@@ -1,191 +1,15 @@
 import re
 import yaml
+from typing import Dict
 from functools import reduce
-from subprocess import run, PIPE, STDOUT, TimeoutExpired
+from subprocess import run, PIPE, TimeoutExpired
 
 CONFIG_FILE = "config.yml"
 
 
-# TODO 优化替换与设置权重的方法，以保持NGINX中的原格式
-class Gateway(object):
-    _server_reg = re.compile(r'(\s+)?(#+)?(\s+)?(\s+)?\bserver\b\s+(\d{1,3}\.){3}\d{1,3}(:\d+)?')
-    _weight_reg = re.compile(r".*weight=(\d{,3}).*")
-    _tag = "W"
-
-    def __init__(self, user: str, host: str) -> None:
-        self.ssh_user = user
-        self.ssh_host = host
-
-    def _execute_cmd(self, command: str):
-        _cmd = r"""ssh {user}@{host} '{command}'""".format(
-            user=self.ssh_user, host=self.ssh_host, command=command
-        )
-        cmd_obj = run(_cmd, shell=True, stdout=PIPE, stderr=STDOUT)
-        output = cmd_obj.stdout.decode("utf8", errors="ignore")
-        if cmd_obj.returncode == 0:
-            return True, output
-        return False, output
-
-    def _filter_upstream(self, line: str) -> str:
-        try:
-            # return is "# server 128.0.255.10:80" or "server 128.0.255.10:80"
-            return self._server_reg.match(line).group().strip()
-        except AttributeError:
-            return ""
-
-    def _get_server_weight(self, line: str) -> str:
-        result = self._weight_reg.match(line)
-        if result:
-            return result.group(1)
-        else:
-            return "1"
-
-    def fmt_down_servers(self, servers: list, operation: str, config_file: str):
-        if not servers:
-            return ""
-        else:
-            _cmds = list()
-            if operation == "down":
-                _fmt = r'sed --follow-symlinks -ri "s/(\s+?server\s+?\b{host}\b.*)/#\1/g" {filename}'
-            elif operation == "down-weight":
-                _fmt = r'sed --follow-symlinks -ri "s/(\s+?server\s+?\b{host}\b.*)/{server}/g" {filename}'
-            else:
-                return ""
-            for server_with_weight in servers:
-                if server_with_weight == "":
-                    continue
-                _server, _weight = server_with_weight.split(self._tag)
-                server = "server {} weight={};".format(_server, _weight)
-                _cmds.append(_fmt.format(host=_server, server=server, filename=config_file))
-            return "&&".join(_cmds)
-
-    def fmt_up_servers(self, servers: list, operation: str, config_file: str):
-        if not servers:
-            return ""
-        else:
-            _cmds = list()
-            if operation == "up,up-weight":
-                # print("已下线机器修改权重并上线")
-                _fmt = r'sed --follow-symlinks -ri "s/(#+?\s+?server\s+?\b{host}\b.*)/{server}/g" {filename}'
-            elif operation == "up":
-                # print("已下线机器只上线")
-                _fmt = r'sed --follow-symlinks -ri "s/#+?\s+?(\s+?server\s+?\b{host}\b.*)/\1/g" {filename}'
-            elif operation == "up-weight":
-                # print("已下线机器只修改权重")
-                _fmt = r'sed --follow-symlinks -ri "s/(\s+?server\s+?\b{host}\b.*)/{server}/g" {filename}'
-            else:
-                return ""
-            for server_with_weight in servers:
-                if server_with_weight == "":
-                    continue
-                _server, _weight = server_with_weight.split(self._tag)
-                server = "server {} weight={};".format(_server, _weight)
-                _cmds.append(_fmt.format(host=_server, server=server, filename=config_file))
-            return "&&".join(_cmds)
-
-    # 只返回指定端口的服务器，在线/下线状态由客户端JS判断
-    def _get_upstream_servers(self, config_file: str) -> (bool, set):
-        """返回Set类型，后续的检查相等函数用得上"""
-        cmd_fmt = r"""grep -E "\s+?#+?\bserver\b\s+.*;" {config_file}"""
-        # cmd_fmt = r"""sed -rn "s/.*\bserver\b(.*\b:{port}\b).*/\1/p;" {config_file}"""
-        command = cmd_fmt.format(user=self.ssh_user, host=self.ssh_host, config_file=config_file)
-        ok, stdout = self._execute_cmd(command)
-        if ok and stdout:
-            all_server = set()
-            for line in stdout.split('\n'):
-                if not line:
-                    continue
-                upstream, weight = self._filter_upstream(line), self._get_server_weight(line)
-                if upstream:
-                    all_server.add("{}{}{}".format(upstream, self._tag, weight))
-            return True, all_server
-        err_msg = stdout
-        return False, err_msg
-
-    def get_domain_servers(self, config_file: str, port: str):
-        ok, output = self._get_upstream_servers(config_file)
-        if ok:
-            hosts = set()
-            for _upstream in output:
-                _server_port, weight = _upstream.split(self._tag)
-                _, _port = _server_port.split(":")
-                if _port == str(port):
-                    upstream = _upstream.strip(" ")
-                    if upstream.startswith("#"):
-                        upstream = re.sub(r'#+', '#', _upstream)
-                        upstream = re.sub(r'#\s+', '#', upstream)
-                    hosts.add(upstream)
-            return True, hosts
-        return False, output
-
-    def set_upstream_with_weight(self, upstream: dict, operation: dict, config_path: str):
-        down_server_cmds = self.fmt_down_servers(upstream.get("down_servers"), operation.get("down", ""), config_path)
-        up_server_cmds = self.fmt_up_servers(upstream.get("up_servers"), operation.get("up", ""), config_path)
-        if down_server_cmds and up_server_cmds:
-            all_cmds = "{}&&{}".format(down_server_cmds, up_server_cmds)
-        elif down_server_cmds and not up_server_cmds:
-            all_cmds = down_server_cmds
-        elif up_server_cmds and not down_server_cmds:
-            all_cmds = up_server_cmds
-        else:
-            all_cmds = ""
-        _ok, _stdout = self._execute_cmd(all_cmds)
-        if _ok:
-            _ok, _stdout = self._reload_service()
-        else:
-            return False, _stdout
-        return _ok, _stdout
-
-    def set_upstreams_status(self, upstreams: list, status: str, config_path: str):
-        cmd_fmt = r'sed --follow-symlinks -ri "s/{status}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
-        cmds = list()
-        for _upstream in upstreams:
-            if status == "up":
-                _cmd = cmd_fmt.format(status="#+", host=_upstream, filename=config_path, flag="")
-            elif status == "down":
-                _cmd = cmd_fmt.format(status="", host=_upstream, filename=config_path, flag="#")
-            else:
-                _cmd = ""
-            cmds.append(_cmd)
-        _ok, _stdout = self._execute_cmd("&&".join(cmds))
-        if _ok:
-            _ok, _stdout = self._reload_service()
-        else:
-            return False, _stdout
-        return _ok, _stdout
-
-    def set_upstream_status(self, upstream: dict, config_path: str):
-        """
-        :param upstream: {"down_servers":["1.1.1.1", "2.2.2.2"], "up_servers":["3.3.3.3","4.4.4.4"]}
-        :param config_path:
-        :return:
-        """
-        _down_servers = upstream.get("down_servers", [])
-        _up_servers = upstream.get("up_servers", [])
-        _cmd_fmt = r'sed --follow-symlinks -ri "s/{status}(\s+?server\s+?\b{host}\b.*)/{flag}\1/g" {filename}'
-        _cmds = list()
-        if _down_servers and _down_servers[0] != "":
-            [_cmds.append(_cmd_fmt.format(status="#+", host=_upstream, filename=config_path, flag=""))
-                for _upstream in _down_servers
-            ]
-        if _up_servers and _up_servers[0] != "":
-            [_cmds.append(_cmd_fmt.format(status="", host=_upstream, filename=config_path, flag="#"))
-                for _upstream in _up_servers
-            ]
-        _ok, _stdout = self._execute_cmd("&&".join(_cmds))
-        if _ok:
-            _ok, _stdout = self._reload_service()
-        else:
-            return False, _stdout
-        return _ok, _stdout
-
-    def _reload_service(self):
-        return self._execute_cmd("nginx -t && nginx -s reload")
-
-
 class CommandError(Exception):
     def __init__(self, msg: str):
-        raise Exception(msg)
+        print("CommandError({})".format(msg))
 
 
 class _BackendServer(object):
@@ -197,7 +21,7 @@ class _BackendServer(object):
         self.weight = _result.group(1) if _result else "1"
         if upstream_item[0] == "#":
             self.is_offline = True
-            _, _host, *_others = upstream_item[1:].split()
+            _, _host, *_others = re.sub(r'#\s+', '', upstream_item).split()
         else:
             self.is_offline = False
             _, _host, *_others = upstream_item.split()
@@ -221,40 +45,82 @@ class _BackendServer(object):
 
 
 class GatewayNGINX(object):
-    _filter_fmt = r"""sed -rn "s/(#?.*\bserver\b.*\b:{port}\b.*).*;/\1/p" {config_file}"""
     _cmd_fmt = "ssh root@{host} '{command}'"
+    # 提取后端服务器正则，后端必须要带端口号
+    _filter_fmt = r"""sed -rn "s/(#?.*\bserver\b.*\b:{port}\b.*).*;/\1/p" {config_file}"""
+    # 上线正则，无需区分是不是要修改权重，因为权重已经传进来
+    _up_fmt = (r'sed --follow-symlinks -ri '
+               r'"s/#+?(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g"  {config_file}')
+    # 下线正则
+    _down_fmt = (r'sed --follow-symlinks -ri '
+                 r'"s/#+?(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/#\1weight={v}\2/g"  {config_file}')
+    # 只修改权重正则
+    _weight_fmt = (r'sed --follow-symlinks -ri '
+                   r'"s/(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g"  {config_file}')
 
     def __init__(self, user: str, host: str):
         self._user = user
         self._host = host
 
-    def _execute(self, cmd: str) -> str:
+    def _execute(self, cmd: str) -> (bool, str):
         _command = self._cmd_fmt.format(host=self._host, command=cmd)
         try:
             std = run(_command, shell=True, timeout=5, stdout=PIPE, stderr=PIPE)
             stdout = std.stdout.decode("utf8", errors="ignore")
             if std.returncode and std.stderr:
                 err_output = std.stderr.decode("utf8", errors="ignore")
-                CommandError(err_output)
+                raise CommandError(err_output)
         except CommandError:
-            stdout = ""
+            return False, ""
         except TimeoutExpired:
-            stdout = ""
-        return stdout
+            return False, ""
+        return True, stdout
+
+    def _reload(self) -> bool:
+        result, _ = self._execute("nginx -t && nginx -s reload")
+        return result
 
     # 如果返回的bool为False，说明数据获取失败
     def get_servers(self, config_file: str, port: str) -> (bool, set):
         servers = set()
         cmd = self._filter_fmt.format(config_file=config_file, port=port)
-        _plain_str = self._execute(cmd)
-        if _plain_str == "":
-            return False, servers
-        for line in _plain_str.split("\n"):
-            if not line:
-                continue
-            server = _BackendServer(line.strip())
-            servers.add(server.string())
-        return True, servers
+        _result, _plain_str = self._execute(cmd)
+        if _result and _plain_str:
+            for line in _plain_str.split("\n"):
+                if not line:
+                    continue
+                server = _BackendServer(line.strip())
+                servers.add(server.string())
+            return True, servers
+        return False, servers
+
+    def change_servers(self, upstream: Dict, operation: Dict, config_file: str) -> (bool, str):
+        down_option, up_option = operation.get("down", ""), operation.get("up", "")
+        # down是要下线的机器['128.0.0.10:80W10']
+        down_servers = [server for server in upstream.get("down_servers", set()) if server != ""]
+        up_servers = [server for server in upstream.get("up_servers", set()) if server != ""]
+        cmds = []
+        if up_option and up_servers:
+            for _server_weight in up_servers:
+                _server, _weight = _server_weight.split("W")
+                _cmd = self._up_fmt.format(host=_server, v=_weight, config_file=config_file)
+                cmds.append(_cmd)
+        if down_option and down_servers:
+            if down_option == "down-weight":
+                _fmt = self._weight_fmt
+            else:
+                _fmt = self._down_fmt
+            for _server_weight in down_servers:
+                _server, _weight = _server_weight.split("W")
+                _cmd = _fmt.format(host=_server, v=_weight, config_file=config_file)
+                cmds.append(_cmd)
+        cmd = "&&".join(cmds)
+        success, output = self._execute(cmd)
+        if not success:
+            return False, ""
+        if self._reload():
+            return True, ""
+        return False, ""
 
 
 class AppConfig(object):
@@ -273,7 +139,7 @@ class AppConfig(object):
         self._config_dic = conf_dict
 
     def get_all_domains(self, name: str = "") -> list:
-        """Support change NGINX upstream's domains"""
+        """Support change NGINX upstream  domains"""
         _all_domains = self.get_attr("domains")
         if name == "nginx":
             _attr = "backend_port"
@@ -316,27 +182,27 @@ def check_equal(data: list) -> tuple:
             if _x == _y:
                 return x
         return False
+
     return reduce(_check, data)
 
 
 if __name__ == "__main__":
-    """
     test_domain = "dev.siss.io"
     config = AppConfig("config.yml")
     print(config.get_domain("dev.siss.io"))
-    user = "user"
-    host = "128.0.255.10"
-    g = Gateway(user, host)
-    # servers = ["128.0.255.29:8080W20"]
+    test_user = "user"
+    test_host = "128.0.255.10"
+    g = GatewayNGINX(test_user, test_host)
+    """
     down_servers = ["128.0.255.27:8080W20"]
     up_servers = ['']
     op = dict(up="up", down="down")
     test_servers = dict(up_servers=up_servers, down_servers=down_servers)
     g.set_upstream_with_weight(test_servers, op, "test.conf")
-    """
     info = "server 172.16.33.4:80"
     info2 = "#       server     172.16.202.249:80     max_fails=3 weight=80;"
     info3 = "server 172.16.202.244:80  weight=10;"
     serve1 = _BackendServer(info2)
     print(serve1)
     print(serve1.format())
+    """
