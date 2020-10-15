@@ -49,8 +49,9 @@
         <p><input type="checkbox" id="weight"/>同时修改权重</p>
       </div>
       -->
-      <div>
+      <div id="change">
           <p><input type="submit" onclick="postData()" style="width:80px;height:50px" value="修改"/></p>
+
       </div>
     </div>
   </body>
@@ -83,6 +84,88 @@ var SERVERS = {
         "172.18.17.68":　"O2O9",
         "172.18.17.74": "O2O6"
 };
+// 狂暴模式
+function beast() {
+  var ok = confirm("慎用！确定执行狂暴模式吗？该模式会将所有服务器上线并将其中一台权重设为100，其他为1");
+  if (ok) {
+    var _domain = $("input:radio[name=domain]:checked").val();0
+    // downServers是HTML中下线中的服务器
+    // up_servers是HTML中在线的服务器
+    var _downServers = new Array();
+    var _upServers = new Array();
+    var downServers=$("input:checkbox[name=servers-down]");
+    var upServers=$("input:checkbox[name=servers-up]");
+    for (var i = 0; i < downServers.length; i++) {
+        _downServers.push(`${downServers[i].value}W1`);
+    };
+    for (var i = 0; i < upServers.length; i++) {
+        if (i == 0) {
+          var weight = "100";
+        } else {
+          var weight = "1";
+        }
+        var value = `${upServers[i].value}W${weight}`;
+        _upServers.push(value);
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "nginx",
+      dataType: "json",
+      data: {
+          domain: _domain,
+          down_servers: _upServers.join(","),
+          up_servers: _downServers.join(","),
+          up_option: "up,up-weight",
+          down_option: "down-weight",
+      }
+    }).always(function (respData) {
+      alert(respData.msg);
+      window.location.reload();
+    });
+
+  };
+};
+
+
+// 狂暴模式
+function recover() {
+  var ok = confirm("正常模式下，会将所有服务器上线，并将所有服务器权重设置为一样，确定执行?");
+  if (ok) {
+    var _domain = $("input:radio[name=domain]:checked").val();0
+    // downServers是HTML中下线中的服务器
+    // up_servers是HTML中在线的服务器
+    var _downServers = new Array();
+    var _upServers = new Array();
+    var downServers=$("input:checkbox[name=servers-down]");
+    var upServers=$("input:checkbox[name=servers-up]");
+    for (var i = 0; i < downServers.length; i++) {
+        _downServers.push(`${downServers[i].value}W1`);
+    };
+    for (var i = 0; i < upServers.length; i++) {
+        var value = `${upServers[i].value}W1`;
+        _upServers.push(value);
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "nginx",
+      dataType: "json",
+      data: {
+          domain: _domain,
+          down_servers: _upServers.join(","),
+          up_servers: _downServers.join(","),
+          up_option: "up,up-weight",
+          down_option: "down-weight",
+      }
+    }).always(function (respData) {
+      alert(respData.msg);
+      window.location.reload();
+    });
+  };
+};
+
+
 // 当选中相关域名时,动态AJAX请求
 function get_backends(domain) {
     $.ajax({
@@ -111,6 +194,11 @@ function get_backends(domain) {
           }else{
             appendToDiv(serverUp, upServers, "up");
           };
+          var change = $("#change");
+          change.append(`
+              <p><button onclick="beast()">狂暴流量打死模式</button><button onclick="recover()">正常平均分配模式</button></p>
+              <p style="color: red">后两种模式请慎用</p>
+          `);
         }else{
           alert(`发生错误: ${data.err_msg}`);
         };
