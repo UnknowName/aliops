@@ -50,8 +50,9 @@
       </div>
       -->
       <div id="change">
+          <!--
           <p><input type="submit" onclick="postData()" style="width:80px;height:50px" value="修改"/></p>
-
+          -->
       </div>
     </div>
   </body>
@@ -195,7 +196,9 @@ function get_backends(domain) {
             appendToDiv(serverUp, upServers, "up");
           };
           var change = $("#change");
+          change.html("");
           change.append(`
+              <p><input type="submit" onclick="postData()" style="width:80px;height:50px" value="修改"/></p>
               <p><button onclick="beast()">狂暴流量打死模式</button><button onclick="recover()">正常平均分配模式</button></p>
               <p style="color: red">后两种模式请慎用</p>
           `);
