@@ -8,10 +8,10 @@ RUN adduser -D -u 120002 -h /opt/app app \
     && echo "StrictHostKeyChecking=no" > .ssh/config \
     && apk add gcc musl-dev libffi-dev make tzdata openssl-dev linux-headers openssh-client \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ pipenv\
+    && pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ pipenv pywinrm ansible \
     && pipenv lock \
     && pipenv install --system --deploy \
-    && apk del libffi-dev gcc make linux-headers openssl-dev musl-dev\
+    && apk del libffi-dev gcc make linux-headers openssl-dev musl-dev \
     && rm -rf /var/cache/apk/*
 ADD id_rsa  /opt/app/.ssh/
 RUN chmod 600 /opt/app/.ssh/* \

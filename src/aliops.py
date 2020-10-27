@@ -29,6 +29,9 @@ def main():
         web.post('/dns/get_ip', aliyun.dns_get_ip),
         web.get('/dns/change', aliyun.dns_change_ip),
         web.get('/check/{domain}', check.check),
+        web.get('/recycle', check.recycle),
+        web.post('/recycle', check.recycle),
+        web.post('/recycle/log', check.recycle_log)
     ]
     app.add_routes(routes)
     web.run_app(app, port=8080, access_log=None)

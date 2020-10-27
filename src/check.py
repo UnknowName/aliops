@@ -1,8 +1,13 @@
+import os
+import time
 import asyncio
+from queue import Queue
 
+import aiohttp_jinja2
 from aiohttp import web, ClientSession
+from jinja2 import Environment, PackageLoader
 
-
+LOG_QUEUE = {}
 SERVERS = {
     "shopapi.sissyun.com.cn": {
         '172.18.0.203': "O2O1",
@@ -53,7 +58,6 @@ async def _get_status(site: str, host: str):
         return 504, host
 
 
-# TODO 504状态红色显示
 async def check(request):
     domain = request.match_info['domain']
     servers = SERVERS.get(domain)
@@ -74,3 +78,57 @@ async def check(request):
     rate = ok / len(servers) * 100
     response += '<p style="color: green">Rate: {}%</p>'.format(rate)
     return web.Response(status=200, text=response, content_type="text/html", charset="utf8")
+
+
+@aiohttp_jinja2.template("log.html")
+async def recycle(request):
+    if request.method == "POST":
+        global LOG_QUEUE
+        domain = os.getenv("domain", None)
+        if domain is None:
+            raise Exception("No domain env config")
+        servers = [
+            "172.18.0.208", "172.18.17.68", "172.18.0.206", "172.18.0.204",
+            "172.18.0.205", "172.18.17.67", "172.18.17.64", "172.18.17.64"
+        ]
+        if not os.path.exists("task.yaml"):
+            env = Environment(loader=PackageLoader('aliops', 'templates'))
+            template = env.get_template('tasks.yaml')
+            tasks_str = template.render(hosts=servers, domain=domain)
+            with open("task.yaml", "w") as f:
+                f.write(tasks_str)
+        thread = await asyncio.create_subprocess_exec(
+            "ansible-playbook", "-v", "task.yaml",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        _key = "{}-{}".format(time.strftime("%Y%m%d%H%M%S"), thread.pid)
+        stdout, _ = await thread.communicate()
+        LOG_QUEUE[_key] = Queue()
+        lines = (line for line in stdout.decode("utf8").split("\n") if line)
+        for line in lines:
+            LOG_QUEUE[_key].put(line)
+        # 最后加一个结束标志
+        LOG_QUEUE[_key].put("EOF")
+        # 客户JS代码，获取日志时，带上此_key
+        return web.json_response({"msg": _key})
+    elif request.method == "GET":
+        return {}
+    else:
+        return web.Response(status=403)
+
+
+async def recycle_log(request):
+    if request.method == "POST":
+        global LOG_QUEUE
+        data = await request.post()
+        _key = data.get("key")
+        queue = LOG_QUEUE.get(_key)
+        if not _key or not queue:
+            return web.Response(status=405, text="Key error")
+        msg = dict(msg=queue.get())
+        await asyncio.sleep(1)
+        return web.json_response(msg)
+    else:
+        return web.Response(status=405)
+

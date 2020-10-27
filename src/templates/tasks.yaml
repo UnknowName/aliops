@@ -1,0 +1,11 @@
+- hosts:
+  {% for host in hosts -%}
+  - {{ host }}
+  {% endfor -%}
+  gather_facts: False
+  serial: 1
+  tasks:
+  - name: Recycle IIS Webappol
+    win_iis_webapppool:
+      name: {{ domain }}
+      state: restart
