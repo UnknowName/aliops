@@ -64,6 +64,9 @@ class GatewayNGINX(object):
 
     def _execute(self, cmd: str) -> (bool, str):
         _command = self._cmd_fmt.format(host=self._host, command=cmd)
+        # 空命令，直接返回True
+        if not cmd.split():
+            return True, ""
         try:
             std = run(_command, shell=True, timeout=5, stdout=PIPE, stderr=PIPE)
             stdout = std.stdout.decode("utf8", errors="ignore")
@@ -102,9 +105,12 @@ class GatewayNGINX(object):
         cmds = []
         if up_option and up_servers:
             for _server_weight in up_servers:
-                _server, _weight = _server_weight.split("W")
-                _cmd = self._up_fmt.format(host=_server, v=_weight, config_file=config_file)
-                cmds.append(_cmd)
+                try:
+                    _server, _weight = _server_weight.split("W")
+                    _cmd = self._up_fmt.format(host=_server, v=_weight, config_file=config_file)
+                    cmds.append(_cmd)
+                except ValueError:
+                    return False, "待上线服务器数据格式有误"
         if down_option and down_servers:
             if down_option == "down-weight":
                 _fmt = self._weight_fmt
@@ -115,6 +121,8 @@ class GatewayNGINX(object):
                 _cmd = _fmt.format(host=_server, v=_weight, config_file=config_file)
                 cmds.append(_cmd)
         cmd = "&&".join(cmds)
+        if not cmd.split():
+            return True, ""
         success, output = self._execute(cmd)
         if not success:
             return False, ""
@@ -164,6 +172,7 @@ class AppConfig(object):
         for _index, _domain in enumerate(_domains):
             if domain in _domain:
                 return _domain[domain]
+        return {}
 
     def get_domain_nginxs(self, domain: str) -> tuple:
         _domain_dict = self.get_domain(domain)

@@ -42,15 +42,14 @@ async def change_upstream(request):
     if request.method == "GET":
         domains = config.get_all_domains("nginx")
         return {'domains': domains}
-    # TODO 逻辑优化
     elif request.method == "POST":
         data = await request.post()
         domain, down_option, up_option = data.get("domain"), data.get("down_option", ""), data.get("up_option", "")
-        nginx_user, nginxs = config.get_domain_nginxs(domain)
         config_file = config.get_domain(domain).get("config_file", "")
+        nginx_user, nginxs = config.get_domain_nginxs(domain)
         if not config_file:
-            logger.error("Domain NGINX config file path not set!")
-            return web.json_response(dict(status=500, msg="配置文件有误,请联系管理员修正"))
+            logger.error("{} Domain NGINX config file path not set!".format(domain))
+            return web.json_response(status=500, data=dict(status=500, msg="配置文件有误或者未配置当前域名,请联系管理员修正"))
         up_servers, down_servers = data.get("up_servers", "").split(","), data.get("down_servers", "").split(",")
         upstream_dic = dict(up_servers=up_servers, down_servers=down_servers)
         operation_dic = dict(down=down_option, up=up_option)
@@ -66,6 +65,6 @@ async def change_upstream(request):
         else:
             err_msg = (output[-1] for output in outputs)
             logger.error("Failed : {0}".format("".join(err_msg)))
-            return web.json_response(dict(status=500, msg="上线失败,请联系管理员查看详细日志"))
+            return web.json_response(status=500, data=dict(status=500, msg="上线失败,请联系管理员查看详细日志"))
     else:
         return web.Response(status=401)
