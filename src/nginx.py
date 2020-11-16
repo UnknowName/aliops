@@ -55,7 +55,6 @@ async def change_upstream(request):
         operation_dic = dict(down=down_option, up=up_option)
         logger.info("Servers is : {0}".format(upstream_dic))
         outputs = [
-            # Gateway(nginx_user, host).set_upstream_with_weight(upstream_dic, operation_dic, config_file)
             GatewayNGINX(nginx_user, host).change_servers(upstream_dic, operation_dic, config_file)
             for host in nginxs
         ]

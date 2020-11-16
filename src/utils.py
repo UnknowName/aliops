@@ -50,13 +50,13 @@ class GatewayNGINX(object):
     _filter_fmt = r"""sed -rn "s/(#?.*\bserver\b.*\b:{port}\b.*).*;/\1/p" {config_file}"""
     # 上线正则，无需区分是不是要修改权重，因为权重已经传进来
     _up_fmt = (r'sed --follow-symlinks -ri '
-               r'"s/#+?(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g"  {config_file}')
+               r'"s/#{1,}(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
     # 下线正则
     _down_fmt = (r'sed --follow-symlinks -ri '
-                 r'"s/#+?(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/#\1weight={v}\2/g"  {config_file}')
+                 r'"s/#{0,}(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/#\1weight={v}\2/g" {config_file}')
     # 只修改权重正则
     _weight_fmt = (r'sed --follow-symlinks -ri '
-                   r'"s/(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g"  {config_file}')
+                   r'"s/(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
 
     def __init__(self, user: str, host: str):
         self._user = user
