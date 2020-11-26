@@ -15,7 +15,7 @@ class CommandError(Exception):
 class _BackendServer(object):
     _weight_reg = re.compile(r".*weight=(\d{,3}).*")
 
-    # 初始化传入NGINX的upstream里面的一条记录;如 server 128.0.0.10:80 weight=10, max_failed=10;
+    # 初始化传入NGINX的upstream里面的一条记录;如 server 128.0.0.10:80 weight=10 max_failed=10;
     def __init__(self, upstream_item: str):
         _result = self._weight_reg.match(upstream_item)
         self.weight = _result.group(1) if _result else "1"
@@ -50,13 +50,13 @@ class GatewayNGINX(object):
     _filter_fmt = r"""sed -rn "s/(#?.*\bserver\b.*\b:{port}\b.*).*;/\1/p" {config_file}"""
     # 上线正则，无需区分是不是要修改权重，因为权重已经传进来
     _up_fmt = (r'sed --follow-symlinks -ri '
-               r'"s/#{1,}(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
+               r'"s/.*(\bserver\b\s?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
     # 下线正则
     _down_fmt = (r'sed --follow-symlinks -ri '
-                 r'"s/#{0,}(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/#\1weight={v}\2/g" {config_file}')
+                 r'"s/.*(\bserver\b\s?\b{host}\b.*)weight=\w+?(.*;)/#\1weight={v}\2/g" {config_file}')
     # 只修改权重正则
     _weight_fmt = (r'sed --follow-symlinks -ri '
-                   r'"s/(.*\bserver\b\s+?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
+                   r'"s/(.*\bserver\b\s?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
 
     def __init__(self, user: str, host: str):
         self._user = user
@@ -195,14 +195,76 @@ def check_equal(data: list) -> tuple:
     return reduce(_check, data)
 
 
+# 该类暂未用到,如果要使用该类，前端页面也需要将相关origin_str传回后端, 该类定义代码需要放在前面
+# 写该类最初目的是支持无weight字段的upstream
+class _Backend(object):
+    # 获取server以后的内容
+    reg = re.compile(r".*server(.*)")
+    offline = False
+    weight = 1
+    regexp_fmt = r"s/.*{addr}.*/{tag} server {addr} weight={v} {other} {comment}/g"
+
+    def __init__(self, origin_str: str):
+        """
+        :param origin_str: example  # server 127.0.0.1:8080 weight=1; #test server
+        """
+        if origin_str.lstrip().startswith("#"):
+            self.offline = True
+        addr, *others = self.reg.match(origin_str).group(1).split()
+        self.addr = addr.strip(";")
+        self.others = list()
+        self.comment = list()
+        for attr in others:
+            if attr.strip().startswith("weight"):
+                _, value = attr.split("=")
+                self.weight = value.strip(";")
+                continue
+            elif attr.strip().startswith("#"):
+                self.comment.append(attr)
+                continue
+            self.others.append(attr)
+
+    def change_regexp(self) -> str:
+        other = " ".join(self.others) if self.others else ";"
+        comment = " ".join(self.comment)
+        if self.offline:
+            return self.regexp_fmt.format(tag="#", addr=self.addr, v=self.weight, other=other, comment=comment)
+        else:
+            return self.regexp_fmt.format(tag="", addr=self.addr, v=self.weight, other=other, comment=comment)
+
+
+# 该类暂未使用,真实情况是程序不会在网关机器上运行，配置文件在另一台主机上
+# 初始化传入NGINX的conf文件内容
+class NGINXConfigParse(object):
+    tag = "upstream"
+
+    def __init__(self, conf_content: str):
+        self.__iter = (line for line in conf_content.split("\n"))
+        self.__start = False
+
+    def get_servers(self, port: str) -> set:
+        servers = set()
+        for line in self.__iter:
+            if line.strip().startswith(self.tag):
+                self.__start = True
+            if not self.__start:
+                continue
+            if line.strip().endswith("}"):
+                break
+            if line and port in line:
+                server = _Backend(line)
+                servers.add(server)
+        return servers
+
+
 if __name__ == "__main__":
+    """
     test_domain = "dev.siss.io"
     config = AppConfig("config.yml")
     print(config.get_domain("dev.siss.io"))
     test_user = "user"
     test_host = "128.0.255.10"
     g = GatewayNGINX(test_user, test_host)
-    """
     down_servers = ["128.0.255.27:8080W20"]
     up_servers = ['']
     op = dict(up="up", down="down")
@@ -215,3 +277,5 @@ if __name__ == "__main__":
     print(serve1)
     print(serve1.format())
     """
+    parse = NGINXConfigParse("test.conf")
+    parse.get_servers("80")
