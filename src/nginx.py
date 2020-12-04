@@ -27,13 +27,16 @@ async def get_domain_attrs(request):
         response = dict(servres=[], status="501", err_msg="出现错误, 网关数据不一致")
     else:
         ok, servers = all_servers.pop()
-        if ok:
+        if ok and servers:
             response = dict(servers=tuple(servers), status="200", err_msg="")
         else:
             # 如果远程命令失败，servers变量是标准错误输出
-            stderr = servers
+            if not servers:
+                stderr = "未能获取到后端服务器，请联系管理员确认配置无误"
+            else:
+                stderr = servers
             logger.info("获取upstreams失败,输出: {0}".format(stderr))
-            response = dict(servers=[], status="500", err_msg=stderr)
+            response = dict(servers=[], status="500", err_msg=str(stderr))
     return web.json_response(response)
 
 
