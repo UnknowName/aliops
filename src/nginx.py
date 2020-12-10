@@ -62,11 +62,8 @@ async def change_upstream(request):
             for host in nginxs
         ]
         if all([success[0] for success in outputs]):
-            logger.info("Success")
             return web.json_response(dict(status=200, msg="修改成功"))
         else:
-            err_msg = (output[-1] for output in outputs)
-            logger.error("Failed : {0}".format("".join(err_msg)))
-            return web.json_response(status=500, data=dict(status=500, msg="上线失败,请联系管理员查看详细日志"))
+            return web.json_response(data=dict(status=500, msg="操作失败,请联系管理员查看详细日志"))
     else:
         return web.Response(status=401)

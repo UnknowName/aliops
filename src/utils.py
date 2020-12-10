@@ -1,9 +1,11 @@
 import re
 import yaml
+import logging
 from typing import Dict
 from functools import reduce
 from subprocess import run, PIPE, TimeoutExpired
 
+log = logging.getLogger("aiohttp")
 CONFIG_FILE = "config.yml"
 
 
@@ -104,10 +106,15 @@ class GatewayNGINX(object):
         up_servers = [server for server in upstream.get("up_servers", set()) if server != ""]
         cmds = []
         if up_option and up_servers:
+            if "up-weight" == up_option:
+                fmt = self._weight_fmt
+            else:
+                # up-weight则为修改权重
+                fmt = self._up_fmt
             for _server_weight in up_servers:
                 try:
                     _server, _weight = _server_weight.split("W")
-                    _cmd = self._up_fmt.format(host=_server, v=_weight, config_file=config_file)
+                    _cmd = fmt.format(host=_server, v=_weight, config_file=config_file)
                     cmds.append(_cmd)
                 except ValueError:
                     return False, "待上线服务器数据格式有误"
@@ -124,6 +131,7 @@ class GatewayNGINX(object):
         if not cmd.split():
             return True, ""
         success, output = self._execute(cmd)
+        log.log(logging.INFO, "success,output is {}".format(output))
         if not success:
             return False, ""
         if self._reload():
