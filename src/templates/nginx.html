@@ -85,6 +85,14 @@ var SERVERS = {
         "172.18.17.68":　"O2O9",
         "172.18.17.74": "O2O6"
 };
+
+// 按列排序函数
+function sortBy(field) {
+    return function(a,b) {
+        return a[field] - b[field];
+    }
+}
+
 // 狂暴模式
 function beast() {
   var ok = confirm("慎用！确定执行狂暴模式吗？该模式会将所有服务器上线并将其中一台权重设为100，其他为1");
@@ -128,8 +136,7 @@ function beast() {
   };
 };
 
-
-// 狂暴模式
+// 正常模式
 function recover() {
   var ok = confirm("正常模式下，会将所有服务器上线，并将所有服务器权重设置为一样，确定执行?");
   if (ok) {
@@ -165,6 +172,8 @@ function recover() {
     });
   };
 };
+
+
 
 
 // 当选中相关域名时,动态AJAX请求
@@ -273,13 +282,25 @@ function getUpDown(servers){
     var _tag = _server_lst[0];
     if (_tag.startsWith('#')) {
       var _server = _server.replace('#', '').trimStart().split(" ")[1];
-      _downServers.push(_server);
+      // _server = 172.18.0.203:80W10
+      var _addrPort = _server.split("W")[0];
+      var _weight = _server.split("W")[1];
+      var _addr = _addrPort.split(":")[0];
+      var _name = SERVERS[_addr];
+      var serverObj = {name: _name, addr: _addrPort, weight: _weight};
+      // console.log(serverObj);
+      _downServers.push(serverObj);
     }else{
       var _server = _server_lst[1];
-      _upServers.push(_server);
+      var _addrPort = _server.split("W")[0];
+      var _weight = _server.split("W")[1];
+      var _addr = _addrPort.split(":")[0];
+      var _name = SERVERS[_addr];
+      var serverObj = {name: _name, addr: _addrPort, weight: _weight};
+      _upServers.push(serverObj);
     };
   };
-  return {downServers: _downServers, upServers: _upServers};
+  return {downServers: _downServers.reverse(sortBy("name")), upServers: _upServers.reverse(sortBy("name"))};
 };
 
 // 将指定服务信息添加进DIV中
@@ -296,10 +317,9 @@ function appendToDiv(div, servers, type){
   for (var i = 0;i < servers.length; i++){
     // _server is like 128.0.255.10w1
     var _server = servers[i];
-    var _server_full = _server.split("W")[0]
-    var _server_weight = _server.split("W")[1]
-    var _server_ip = _server_full.split(":")[0];
-    var _server_name = SERVERS[_server_ip];
+    var _server_full = _server.addr
+    var _server_weight = _server.weight;
+    var _server_name = _server.name;
 
     if (_server_name == undefined) {
       var htmlContent = `${_server_full}&nbsp;`
@@ -334,12 +354,6 @@ function appendToDiv(div, servers, type){
   `
   div.append(divContext);
 };
-
-/*
-function sleep(d){
-  for(var t = Date.now();Date.now() - t <= d;);
-};
-*/
 
 function getFormObj(formId) {
     var formObj = {};
