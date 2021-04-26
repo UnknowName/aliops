@@ -59,7 +59,11 @@ class GatewayNGINX(object):
 
     # 只上线，针对API
     _only_up_fmt = (r'sed --follow-symlinks -ri '
-                    r'"s/.*(\bserver\b\s?\b{host}\b.*;)/\1/g" {config_file}')
+                    r'"s/.*(\bserver\b\s?\b{host}\b.*)/\1/g" {config_file}')
+
+    # 只下线，针对API
+    _only_down_fmt = (r'sed --follow-symlinks -ri '
+                      r'"s/.*(\bserver\b\s?\b{host}\b.*)/#\1/g" {config_file}')
 
     # 只修改权重正则
     _weight_fmt = (r'sed --follow-symlinks -ri '
@@ -132,6 +136,8 @@ class GatewayNGINX(object):
         if down_option and down_servers:
             if down_option == "down-weight":
                 _fmt = self._weight_fmt
+            elif down_option == "only-down":
+                _fmt = self._only_down_fmt
             else:
                 _fmt = self._down_fmt
             for _server_weight in down_servers:
