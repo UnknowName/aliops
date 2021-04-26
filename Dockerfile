@@ -1,4 +1,6 @@
 FROM python:3.7-alpine
+ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1 \
+    TZ=Asia/Shanghai
 ADD ./src /opt/app
 ADD ./Pipfile /opt/app
 WORKDIR /opt/app
