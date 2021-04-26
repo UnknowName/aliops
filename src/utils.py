@@ -50,12 +50,17 @@ class GatewayNGINX(object):
     _cmd_fmt = "ssh root@{host} '{command}'"
     # 提取后端服务器正则，后端必须要带端口号
     _filter_fmt = r"""sed -rn "s/(#?.*\bserver\b.*\b:{port}\b.*).*;/\1/p" {config_file}"""
-    # 上线正则，无需区分是不是要修改权重，因为权重已经传进来
+    # 上线正则，无需区分是不是要修改权重，因为权重已经传进来.针对网页端
     _up_fmt = (r'sed --follow-symlinks -ri '
                r'"s/.*(\bserver\b\s?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
     # 下线正则
     _down_fmt = (r'sed --follow-symlinks -ri '
                  r'"s/.*(\bserver\b\s?\b{host}\b.*)weight=\w+?(.*;)/#\1weight={v}\2/g" {config_file}')
+
+    # 只上线，针对API
+    _only_up_fmt = (r'sed --follow-symlinks -ri '
+                    r'"s/.*(\bserver\b\s?\b{host}\b.*;)/\1/g" {config_file}')
+
     # 只修改权重正则
     _weight_fmt = (r'sed --follow-symlinks -ri '
                    r'"s/(.*\bserver\b\s?\b{host}\b.*)weight=\w+?(.*;)/\1weight={v}\2/g" {config_file}')
@@ -99,6 +104,7 @@ class GatewayNGINX(object):
             return True, servers
         return False, servers
 
+    # TODO 校验后端服务器数据抽取成一个函数
     def change_servers(self, upstream: Dict, operation: Dict, config_file: str) -> (bool, str):
         down_option, up_option = operation.get("down", ""), operation.get("up", "")
         # down是要下线的机器['128.0.0.10:80W10']
@@ -108,13 +114,18 @@ class GatewayNGINX(object):
         if up_option and up_servers:
             if "up-weight" == up_option:
                 fmt = self._weight_fmt
+            elif up_option == "only-up":
+                fmt = self._only_up_fmt
             else:
                 # up-weight则为修改权重
                 fmt = self._up_fmt
             for _server_weight in up_servers:
                 try:
                     _server, _weight = _server_weight.split("W")
-                    _cmd = fmt.format(host=_server, v=_weight, config_file=config_file)
+                    _int_weight = int(_weight)
+                    if _int_weight <= 0 or _int_weight > 100:
+                        return False, "权重为1-100的数字"
+                    _cmd = fmt.format(host=_server, v=_int_weight, config_file=config_file)
                     cmds.append(_cmd)
                 except ValueError:
                     return False, "待上线服务器数据格式有误"
@@ -124,9 +135,15 @@ class GatewayNGINX(object):
             else:
                 _fmt = self._down_fmt
             for _server_weight in down_servers:
-                _server, _weight = _server_weight.split("W")
-                _cmd = _fmt.format(host=_server, v=_weight, config_file=config_file)
-                cmds.append(_cmd)
+                try:
+                    _server, _weight = _server_weight.split("W")
+                    _int_weight = int(_weight)
+                    if _int_weight <= 0 or _int_weight > 100:
+                        return False, "权重为1-100的数字"
+                    _cmd = _fmt.format(host=_server, v=_int_weight, config_file=config_file)
+                    cmds.append(_cmd)
+                except ValueError:
+                    return False, "下线服务器数据格式有误"
         cmd = "&&".join(cmds)
         if not cmd.split():
             return True, ""
