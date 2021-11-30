@@ -16,15 +16,18 @@ async def get_domain_attrs(request):
     domain = data.get("domain", "")
     nginx_user, nginxs = config.get_domain_nginxs(domain)
     config_file = config.get_domain(domain).get("config_file", "")
-    backend_port = config.get_domain(domain).get("backend_port")
+    backend_port = config.get_domain(domain).get("backend_port", "")
+    if backend_port == "":
+        response = dict(servres=[], status="500", err_msg="当前域名后端端口配置有误，请联系管理员")
+        return web.json_response(response)
     all_servers = [
-        GatewayNGINX(nginx_user, host).get_servers(config_file, backend_port)
+        GatewayNGINX(nginx_user, host).get_servers(config_file, str(backend_port))
         for host in nginxs
     ]
     if not check_equal(all_servers):
         # 网关数据不一样，有可能是因为主机连接失败，打印到终端用于DEBUG
         logger.info("执行获取{0}网关数据，数据不一致: {1}".format(domain, all_servers))
-        response = dict(servres=[], status="501", err_msg="出现错误, 网关数据不一致")
+        response = dict(servres=[], status="501", err_msg="网关数据不一致,请联系管理员")
     else:
         ok, servers = all_servers.pop()
         if ok and servers:

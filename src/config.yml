@@ -10,7 +10,7 @@ domains:
           #- 128.0.255.3
       # in NGINX config file.the upstream server's port
       # exits the backend_port,the domain will display on /nginx URL
-      backend_port: 8080
+      backend_port: 8080,80 # 多端口用逗号分隔
       config_file: /etc/nginx/conf.d/dev.siss.io.conf
       # if not present,Use default backends
       slb_virtual_name: 测试中文
