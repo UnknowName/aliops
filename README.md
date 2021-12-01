@@ -33,6 +33,8 @@ cp src/config.yml config.yml
 
 ## 4. 启动
 ```bash
+# 镜像会使用当前用户的私钥，用于连接远程NGINX
+cp ~/.ssh/id_rsa ./
 docker-compose up -d
 ```
 
@@ -50,7 +52,8 @@ domains:
           - 128.0.255.2
           - 128.0.255.3
       # 代码的后端服务器的端口,如果不填写.NGINX页面不显示
-      backend_port: 8080
+      # 多端口使用逗号分隔
+      backend_port: 8080,80
       # NGINX代理该域名的后端配置文件
       config_file: /etc/nginx/conf.d/dev.siss.io.conf
       # 该域名的SLB ID,不是必须项,如果要使用SLB上/下线功能,填写.不填写SLB页面不显示
