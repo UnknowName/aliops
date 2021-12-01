@@ -96,19 +96,21 @@ class GatewayNGINX(object):
 
     def get_servers(self, config_file: str, port: str) -> (bool, set):
         servers = set()
+        cmd = "cat /dev/null"
         for _port in port.split(","):
             if _port == "":
                 continue
-            cmd = self._filter_fmt.format(config_file=config_file, port=_port)
-            _result, _plain_str = self._execute(cmd)
-            if _result and _plain_str:
-                for line in _plain_str.split("\n"):
-                    if not line:
-                        continue
-                    server = _BackendServer(line.strip())
-                    servers.add(server.string())
-            else:
-                return False, servers
+            _cmd = self._filter_fmt.format(config_file=config_file, port=_port)
+            cmd = f"{cmd}&&{_cmd}"
+        ok, stdout = self._execute(cmd)
+        if ok and stdout:
+            for line in stdout.split("\n"):
+                if not line:
+                    continue
+                server = _BackendServer(line.strip())
+                servers.add(server.string())
+        else:
+            return False, servers
         return True, servers
 
     # TODO 校验后端服务器数据抽取成一个函数
