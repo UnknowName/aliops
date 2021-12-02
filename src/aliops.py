@@ -21,6 +21,8 @@ def main():
         web.post('/nginx', nginx.change_upstream),
         web.post('/domain/{attr}', nginx.get_domain_attrs),
         web.get('/slb', aliyun.slb_index),
+        web.get('/cdn/cache', aliyun.flush_cache),
+        web.post('/cdn/cache', aliyun.flush_cache),
         web.post('/slb/info', aliyun.get_slb_backends),
         web.get('/slb/change', aliyun.change_slb_backend),
         web.get('/slb/acl', aliyun.slb_add_ip),

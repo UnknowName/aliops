@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CDN 刷新</title>
+    <style>
+        li { font-size: 15px; margin: 2px auto}
+    </style>
+</head>
+<body>
+    <h4>注意事项</h4>
+    <ol>
+        <li><span style="color: red">HTTP与HTTP都要清理一次，所以同一个资源需要同时指定HTTP的URL与HTTPS的URL</span></li>
+        <li>如果待刷新的是单个文件，输入完整URL，如: https://www.example.com/js/main.js</li>
+        <li>如果待刷新的是一个目录，输入URL目录，如: https://www.example/js/</li>
+        <li>一行对应一个待清理对象，不要将多个对象放在同一行</li>
+    </ol>
+    <form id="form" method="post" action="cache">
+        <textarea cols="80", rows="10" name="urls"></textarea>
+        <p><input type="submit" style="width:80px;height:50px" value="提交"/></p>
+    </form>
+</body>
+<script>
+</script>
+</html>

@@ -15,6 +15,7 @@ aliyun-python-sdk-ecs = "*"
 aliyunsdkcore = "*"
 aliyun-python-sdk-core-v3 = "*"
 aliyun-python-sdk-alidns = "*"
+alibabacloud-cdn20180510 = "*"
 
 [requires]
 python_version = "3.7"

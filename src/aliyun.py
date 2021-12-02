@@ -1,8 +1,14 @@
+import time
+import asyncio
 import json
 import socket
 
 import aiohttp_jinja2
 from aiohttp import web
+
+from alibabacloud_tea_openapi import models as open_api_models
+from alibabacloud_cdn20180510 import models as cdn_20180510_models
+from alibabacloud_cdn20180510.client import Client as Cdn20180510Client
 
 from aliyunsdkcore.client import AcsClient
 from aliyunsdkecs.request.v20140526.DescribeInstancesRequest import DescribeInstancesRequest
@@ -14,7 +20,6 @@ from aliyunsdkslb.request.v20140515.SetVServerGroupAttributeRequest import SetVS
 from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
 from aliyunsdkslb.request.v20140515.DescribeVServerGroupAttributeRequest import DescribeVServerGroupAttributeRequest
 from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
-
 
 from utils import AppConfig
 
@@ -28,6 +33,39 @@ if dns_key and dns_region and dns_secret:
     dns_client = AcsClient(dns_key, dns_secret, dns_region)
 else:
     dns_client = client
+
+
+@aiohttp_jinja2.template("cdn.html")
+async def flush_cache(request):
+    if request.method == "GET":
+        return {}
+    elif request.method == "POST":
+        data = await request.post()
+        url = data.get("urls").replace("\r", " ").replace("\n", " ")
+        if url == "":
+            return web.Response(status=200, text="URL为空")
+        _config = open_api_models.Config(aeskey, secret)
+        _config.endpoint = 'cdn.aliyuncs.com'
+        cdn_client = Cdn20180510Client(_config)
+        tasks = list()
+        security_token = time.asctime()
+        for _url in url.split():
+            url_type = "file"
+            if _url.endswith("/"):
+                url_type = "directory"
+            req = cdn_20180510_models.RefreshObjectCachesRequest(
+                object_type=url_type,
+                object_path=_url,
+                security_token=security_token
+            )
+            task = cdn_client.refresh_object_caches_async(req)
+            tasks.append(task)
+        _dones, _ = await asyncio.wait(tasks)
+        results = [_done.result() for _done in _dones]
+        body_dicts = [r.to_map().get("body") for r in results]
+        print(body_dicts)
+        return web.json_response(body_dicts)
+    return web.Response(status=403, text=request.method)
 
 
 @aiohttp_jinja2.template("aliyun.html")
