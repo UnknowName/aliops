@@ -10,7 +10,7 @@ RUN adduser -D -u 120002 -h /opt/app app \
     && echo "StrictHostKeyChecking=no" > .ssh/config \
     && apk add gcc musl-dev libffi-dev make tzdata openssl-dev linux-headers openssh-client \
     && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && pip install --no-cache-dir -r requirements.txt \
+    && pip install -i https://mirrors.aliyun.com/pypi/simple/ --no-cache-dir -r requirements.txt \
     && apk del libffi-dev gcc make linux-headers openssl-dev musl-dev \
     && rm -rf /var/cache/apk/*
 ADD id_rsa  /opt/app/.ssh/
