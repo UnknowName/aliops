@@ -60,10 +60,12 @@ async def flush_cache(request):
             )
             task = cdn_client.refresh_object_caches_async(req)
             tasks.append(task)
-        _dones, _ = await asyncio.wait(tasks)
-        results = [_done.result() for _done in _dones]
-        body_dicts = [r.to_map().get("body") for r in results]
-        print(body_dicts)
+        try:
+            _dones, _ = await asyncio.wait(tasks)
+            results = [_done.result() for _done in _dones]
+            body_dicts = [r.to_map().get("body") for r in results]
+        except Exception as e:
+            body_dicts = [dict(ErrorMessage=str(e))]
         return web.json_response(body_dicts)
     return web.Response(status=403, text=request.method)
 
