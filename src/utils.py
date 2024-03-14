@@ -9,6 +9,14 @@ log = logging.getLogger("aiohttp")
 CONFIG_FILE = "config.yml"
 
 
+# 返回的响应体
+class BackendInfo(object):
+    def __init__(self, instance_id: str, port: str, weight: str):
+        self.id = instance_id
+        self.port = port
+        self.weight = weight
+
+
 class CommandError(Exception):
     def __init__(self, msg: str):
         print("CommandError({})".format(msg))

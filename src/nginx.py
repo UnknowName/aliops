@@ -3,7 +3,8 @@ import logging
 import aiohttp_jinja2
 from aiohttp import web
 
-from utils import AppConfig, check_equal, GatewayNGINX
+from config import AppConfig
+from utils import check_equal, GatewayNGINX
 
 log_fmt = "%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s"
 logging.basicConfig(level=logging.INFO, format=log_fmt)
@@ -14,9 +15,10 @@ config = AppConfig()
 async def get_domain_attrs(request):
     data = await request.post()
     domain = data.get("domain", "")
-    nginx_user, nginxs = config.get_domain_nginxs(domain)
-    config_file = config.get_domain(domain).get("config_file", "")
-    backend_port = config.get_domain(domain).get("backend_port", "")
+    domain_conf = config.get_domain_config(domain)
+    nginx_user, nginxs = domain_conf.nginx.ssh_user, domain_conf.nginx.hosts
+    config_file = domain_conf.nginx.config_file
+    backend_port = domain_conf.nginx.backend_port
     if backend_port == "":
         response = dict(servres=[], status="500", err_msg="当前域名后端端口配置有误，请联系管理员")
         return web.json_response(response)
@@ -46,13 +48,14 @@ async def get_domain_attrs(request):
 @aiohttp_jinja2.template("nginx.html")
 async def change_upstream(request):
     if request.method == "GET":
-        domains = config.get_all_domains("nginx")
+        domains = list([domain for domain, conf in config.domain.items() if conf.nginx is not None])
         return {'domains': domains}
     elif request.method == "POST":
         data = await request.post()
         domain, down_option, up_option = data.get("domain"), data.get("down_option", ""), data.get("up_option", "")
-        config_file = config.get_domain(domain).get("config_file", "")
-        nginx_user, nginxs = config.get_domain_nginxs(domain)
+        domain_conf = config.get_domain_config(domain)
+        nginx_user, nginxs = domain_conf.nginx.ssh_user, domain_conf.nginx.hosts
+        config_file = domain_conf.nginx.config_file
         if not config_file:
             logger.error("{} Domain NGINX config file path not set!".format(domain))
             return web.json_response(status=500, data=dict(status=500, msg="配置文件有误或者未配置当前域名,请联系管理员修正"))

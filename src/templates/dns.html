@@ -42,8 +42,8 @@ function GetDomainIp(domain) {
           domain: domain,
       }
     }).always(function(data) {
-        var ipDiv = $('#ip');
-         if (JSON.stringify(data) == "{}") {
+         var ipDiv = $('#ip');
+         if (JSON.stringify(data) == "{}" || data.status == 500) {
             alert("API帐号下未发现有此域名记录，请联系管理员查实！");
             window.location.reload();
             return;
@@ -66,11 +66,6 @@ function GetDomainIp(domain) {
                 ipDiv.html("");
                 ipDiv.append(`<p id="info">当前域名的默认线路解析IP为:${recordIP},&nbsp;可用IP为:</p>`);
                 for (var i=0;i<backupIps.length;i++) {
-                    /*
-                    if (backupIps[i] == recordIP) {
-                        continue;
-                     };
-                     */
                      var html = `
                      <p>
                         ${backupIps[i]}

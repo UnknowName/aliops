@@ -19,8 +19,8 @@
         {% for domain, slbs in  dic.items() %}
             <p>{{ domain }}</p>
             <ul>
-                {% for slb_with_virtual in slbs %}
-                <li><input type="radio" name="slb" value="{{ slb_with_virtual }}"/>{{ slb_with_virtual.split("/")[0] }}</li>
+                {% for slb_id in slbs %}
+                <li><input type="radio" name="slb" value="{{ slb_id }}:{{ domain }}"/>{{ slb_id }}</li>
                 {% endfor %}
             </ul>
         {% endfor %}
@@ -55,13 +55,14 @@ function getSlbInfo(slb_id) {
       slb.append("<p class='server'>名称: " + data.name + "</p>");
       var backendServers = data.servers;
       if (backendServers.length > 0) {
-        slb.append("<p class='server'>默认后端服务器:</p>");
+        slb.append("<p class='server'>后端服务器:</p>");
         for (var i=0;i < backendServers.length;i++) {
           var serverId = backendServers[i].id;
           var serverName = backendServers[i].name;
           var serverInnerIP = backendServers[i].private_ip;
           var serverPublicIP = backendServers[i].public_ip;
           var serverGroupId = backendServers[i].virtual_id;
+          var serverPort = backendServers[i].port;
           if (typeof serverPublicIP == "undefined") {
             var serverPublicIP = "无";
           };
@@ -77,9 +78,14 @@ function getSlbInfo(slb_id) {
             <li class="server" style="color: ${color};margin: 10px 10px" id="${serverId}">
               <p>ECS名称:   ${serverName}</p>
               <p>ECS内网IP: ${serverInnerIP}</p>
+              <p>ECS服务端口: ${serverPort}</p>
               <p>ECS外网IP: ${serverPublicIP}&nbsp;&nbsp;${notice}</p>
-              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'offline', '${serverGroupId}')">下线</button>
-              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'online', '${serverGroupId}')">上线</button>
+              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'offline', '${serverGroupId}', '${serverPort}')">
+                下线
+              </button>
+              <button onclick="changeServerStatus('${serverId}', '${slb_id}', 'online', '${serverGroupId}', '${serverPort}')">
+                上线
+              </button>
             </li>
           `;
           slb.append(html);
@@ -90,10 +96,10 @@ function getSlbInfo(slb_id) {
 
 //对指定SLB的指定ECS执行上下线操作（将权重设置为0/100）
 //action为online/offline两种选项
-function changeServerStatus(ecsId, slbId, action, virtual_id) {
+function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
     $.ajax({
       type: "GET",
-      url: `slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}&virtual_id=${virtual_id}`,
+      url: `slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}&virtual_id=${virtual_id}&port=${port}`,
       dataType: "json",
     }).always(function (response) {
         if (response.status == undefined) {
@@ -114,6 +120,26 @@ function changeServerStatus(ecsId, slbId, action, virtual_id) {
                     serverObject.html(newHtml);
                 };
             };
+        } else if (response.status == 200 ) {
+            var servers = response.servers;
+            for (var i = 0; i < servers.length;i++) {
+                var server = servers[i];
+                if (server.ServerId == ecsId){
+                    var serverId = "#" + server.ServerId;
+                    serverObject = $(serverId);
+                    if (action == "offline") {
+                        serverObject.css("color", "red");
+                        var newHtml = serverObject.html().replace("上线中", "已下线");
+                    }else{
+                        serverObject.css("color", "green");
+                        var newHtml = serverObject.html().replace("已下线", "上线中");
+                    };
+                    alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
+                    serverObject.html(newHtml);
+                };
+            }
+        } else if (response.status == 403) {
+            alert(`当前只有一台主机在线，不允许执行下线操作`);
         } else {
             alert("设置失败，请重试或者联系管理员");
         };

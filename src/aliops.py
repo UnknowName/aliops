@@ -2,9 +2,11 @@ import jinja2
 import aiohttp_jinja2
 from aiohttp import web
 
+import es
 import nginx
 import aliyun
 import check
+import ali
 
 
 @aiohttp_jinja2.template("index.html")
@@ -33,7 +35,9 @@ def main():
         web.get('/check/{domain}', check.check),
         web.get('/recycle', check.recycle),
         web.post('/recycle', check.recycle),
-        web.post('/recycle/log', check.recycle_log)
+        web.post('/recycle/log', check.recycle_log),
+        web.get('/log/sum', es.sum_error),
+        web.get('/log/list', es.log_list),
     ]
     app.add_routes(routes)
     web.run_app(app, port=8080, access_log=None)

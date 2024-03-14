@@ -1,36 +1,38 @@
 domains:
-  - test.unknowname.win_18912:
-      # for change dns record
-      # domain: unknowname.win
-      # for nginx
-      #nginx:
-        #ssh_user: username
-        #hosts:
-          #- 128.0.255.2
-          #- 128.0.255.3
+  - display: ops.sissyun.com.cn_test
+    domain: sissyun.com.cn
+    slb:
+      # if not present,Use default backends
+      backend_virtual_name: graylog #bank-consumer
+      type: clb #clb/nlb
+      ids:
+      - lb-wz9obyqmiidllwulomjxh
+      # - lb-wz9obeo6c187qydidoehe
+    ips:
+    # ips要和正式解析对应，否则页面不显示，用于DNS修改
+    - 39.108.27.240
+
+  - display: finance-internal
+    slb:
+      type: nlb
+      backend_virtual_name: test
+      ids:
+      - nlb-oon7cfhgpay4l6quu1
+
+  - display: test.unknowname.cn_18912
+    domain: unknowname.cn
+    ips:
+      - 2.2.2.2
+    # 如果有配置项，将会在nginx页面显示
+    nginx:
+      ssh_user: username
+      hosts:
+      - 128.0.255.2
+      - 128.0.255.3
       # in NGINX config file.the upstream server's port
       # exits the backend_port,the domain will display on /nginx URL
       backend_port: 8080,80 # 多端口用逗号分隔
       config_file: /etc/nginx/conf.d/dev.siss.io.conf
-      # if not present,Use default backends
-      slb_virtual_name: 测试中文
-      slbs:
-        # No set, will no display on /slb url
-        - lb-wz9obyqmiidllwulomjxh
-      ips:
-        # No set,  will no display on /dns url
-        - 120.77.199.116
-
-  - test.unknowname.win_10050:
-      # for change dns record
-      domain: unknowname.win
-      # for nginx
-      config_file: /etc/nginx/conf.d/www.unknowname.win.conf
-      backend_port: 80
-      slbs:
-        - lb-wz9obyqmiidllwulomjxh #test
-      ips:
-        - 128.0.255.10
 
 # Global NGINX.if domains section no nginx present,use here
 nginx:
@@ -39,12 +41,17 @@ nginx:
     - 128.0.255.12
     - 128.0.255.13
 
-api:
-  aeskey: key
-  aeskey_secret: secret
+slb_api:
+  key: key
+  secret: secret
   region: cn-shenzhen
 
 dns_api:
-  aeskey: ""
-  aeskey_secret: ""
+  key: key
+  secret: secret
   region: cn-shenzhen
+
+es:
+  addr: 128.0.255.10
+  port: 9200
+  index: indexName
