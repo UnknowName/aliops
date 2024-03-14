@@ -6,7 +6,6 @@ import es
 import nginx
 import aliyun
 import check
-import ali
 
 
 @aiohttp_jinja2.template("index.html")
