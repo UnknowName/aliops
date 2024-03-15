@@ -54,6 +54,7 @@ function getSlbInfo(slb_id) {
       slb.append("<p class='server'>IP: " + data.ip + "</p>");
       slb.append("<p class='server'>名称: " + data.name + "</p>");
       var backendServers = data.servers;
+      backendServers.sort(sortByName);
       if (backendServers.length > 0) {
         slb.append("<p class='server'>后端服务器:</p>");
         for (var i=0;i < backendServers.length;i++) {
@@ -104,6 +105,8 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
     }).always(function (response) {
         if (response.status == undefined) {
             var servers = response.BackendServers.BackendServer;
+            servers.sort(sortByName);
+            console.log(`servers=${servers}`);
             for(var i=0;i<servers.length;i++) {
                 server = servers[i];
                 if (server.ServerId == ecsId) {
@@ -122,6 +125,7 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
             };
         } else if (response.status == 200 ) {
             var servers = response.servers;
+            servers.sort(sortByName);
             for (var i = 0; i < servers.length;i++) {
                 var server = servers[i];
                 if (server.ServerId == ecsId){
@@ -145,5 +149,9 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
         };
     });
 };
+
+function sortByName(a, b) {
+    return a.name.localeCompare(b.name);
+}
 </script>
 </html>
