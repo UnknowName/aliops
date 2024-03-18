@@ -7,7 +7,7 @@ from aiohttp import web
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cdn20180510 import models as cdn_20180510_models
 from alibabacloud_cdn20180510.client import Client as Cdn20180510Client
-from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
+
 
 import manager
 from config import AppConfig
@@ -130,14 +130,14 @@ async def dns_change_ip(request):
     domain = request.query.get("domain")
     ip = request.query.get("ip")
     domain_conf = config.get_domain_config(domain)
-    backup_ips = domain_conf.ip.keys()
+    backup_ips = domain_conf.ip
     if ip not in backup_ips:
         resp = dict(msg="非法IP!修改只限已给定列表中的IP")
         return web.json_response(resp)
     record_id = request.query.get("id")
     domain_record, *_ = domain.split(".")
     agent = manager.DNSAgent(config.dns_api.key, config.dns_api.secret, config.dns_api.region)
-    print(domain_conf.domain, domain_record, record_id, ip)
+    print(f"修改{domain_conf.domain}记录{domain_record}的新IP为{ip}")
     resp = agent.change_record(domain_conf.domain, domain_record, record_id, ip)
     return web.json_response(resp)
 
@@ -148,16 +148,9 @@ async def slb_add_ip(request):
         return {}
     elif request.method == 'POST':
         data = await request.post()
-        ip, comment = data.get("ip", ""), data.get("comment", "")
+        ip, comment = data.get("ip", None), data.get("comment", "")
         if not ip:
             return web.json_response({"status": "invalid ip"})
-        req = AddAccessControlListEntryRequest()
-        req.set_accept_format('json')
-        req.set_AclId("acl-wz9lkxbst9kk1v57lz3ha")
-        entrys = [{"entry": "{}/32".format(ip), "comment": comment}]
-        req.set_AclEntrys(entrys)
-        try:
-            client.do_action_with_exception(req)
-        except Exception:
-            return web.json_response({"status": "error"})
-        return web.json_response({"status": "success"})
+        agent = manager.ACLAgent(config.slb_api.key, config.slb_api.secret, config.slb_api.region)
+        resp = agent.add_ip(ip, comment)
+        return web.json_response(resp)

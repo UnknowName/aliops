@@ -24,6 +24,10 @@
                 alert("IP不能为空!");
                 return false;
             };
+            if (comment == undefined || comment == "") {
+                alert("备注不能为空!");
+                return false;
+            };
             var exp = /^(?!.*\.$)((?!0\d)(1?\d?\d|25[0-5]|2[0-4]\d)(\.|$)){4}$/
             if(ip.match(exp)) {
                 $.ajax({
@@ -35,7 +39,7 @@
                       comment: comment
                    }
                 }).always(function(data) {
-                    if(data.status == "success") {
+                    if(data.status == "ok") {
                         alert("添加成功");
                     }else{
                         alert("添加失败");

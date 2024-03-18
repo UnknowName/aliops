@@ -13,13 +13,15 @@ from aliyunsdkslb.request.v20140515.SetVServerGroupAttributeRequest import SetVS
 from aliyunsdkslb.request.v20140515.DescribeVServerGroupAttributeRequest import DescribeVServerGroupAttributeRequest
 from aliyunsdkslb.request.v20140515.DescribeLoadBalancerAttributeRequest import DescribeLoadBalancerAttributeRequest
 # NLB import
-from alibabacloud_nlb20220430.client import Client as Nlb20220430Client
+from alibabacloud_tea_util import models as util_models
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_nlb20220430 import models as nlb_20220430_models
-from alibabacloud_tea_util import models as util_models
+from alibabacloud_nlb20220430.client import Client as Nlb20220430Client
 # DNS
 from aliyunsdkalidns.request.v20150109.UpdateDomainRecordRequest import UpdateDomainRecordRequest
 from aliyunsdkalidns.request.v20150109.DescribeDomainRecordsRequest import DescribeDomainRecordsRequest
+# ACL
+from aliyunsdkslb.request.v20140515.AddAccessControlListEntryRequest import AddAccessControlListEntryRequest
 
 from utils import BackendInfo
 
@@ -305,10 +307,12 @@ class NLBLoadBalance(AliyunLoadBalance):
             return dict(status=500, text=str(e))
 
 
-class DNSAgent(object):
+class ClassicAgent(object):
     def __init__(self, key: str, secret: str, region: str):
         self.client = AcsClient(key, secret, region)
 
+
+class DNSAgent(ClassicAgent):
     def get_record(self, domain: str, keyword: str) -> Dict:
         req = DescribeDomainRecordsRequest()
         req.set_accept_format('json')
@@ -339,6 +343,20 @@ class DNSAgent(object):
             return dict(status=400, msg="not found")
         except Exception as e:
             return dict(status=500, msg=str(e))
+
+
+class ACLAgent(ClassicAgent):
+    def add_ip(self, ip: str, comment: str) -> Dict:
+        req = AddAccessControlListEntryRequest()
+        req.set_accept_format('json')
+        req.set_AclId("acl-wz9lkxbst9kk1v57lz3ha")
+        entries = [{"entry": "{}/32".format(ip), "comment": comment}]
+        req.set_AclEntrys(entries)
+        try:
+            self.client.do_action_with_exception(req)
+        except Exception as e:
+            return dict(status=str(e))
+        return dict(status="ok")
 
 
 if __name__ == '__main__':

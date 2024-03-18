@@ -105,7 +105,7 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
     }).always(function (response) {
         if (response.status == undefined) {
             var servers = response.BackendServers.BackendServer;
-            servers.sort(sortByName);
+            // servers.sort(sortByName);
             console.log(`servers=${servers}`);
             for(var i=0;i<servers.length;i++) {
                 server = servers[i];
@@ -125,7 +125,7 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
             };
         } else if (response.status == 200 ) {
             var servers = response.servers;
-            servers.sort(sortByName);
+            // servers.sort(sortByName);
             for (var i = 0; i < servers.length;i++) {
                 var server = servers[i];
                 if (server.ServerId == ecsId){
