@@ -199,12 +199,14 @@ class CLBLoadBalance(AliyunLoadBalance):
                 req.set_VServerGroupId(option.virtual_id)
                 req.set_BackendServers(backends)
             except Exception as e:
-                return dict(status=500, text=str(e))
+                return dict(status=500, slb_id=slb_id, servers=[], text=str(e))
         try:
             response = self.client.do_action_with_exception(req)
-            return dict(status=200, text=response.decode("utf8"))
+            resp = json.loads(response)
+            servers = resp.get("BackendServers", {}).get("BackendServer", [])
+            return dict(status=200, slb_id=slb_id, servers=servers, text="ok")
         except Exception as e:
-            return dict(status=500, text=str(e))
+            return dict(status=500, slb_id=slb_id, servers=[], text=str(e))
 
 
 # Aliyun NBL 网络负载均衡
@@ -300,11 +302,11 @@ class NLBLoadBalance(AliyunLoadBalance):
                         loading = False
                         break
                 time.sleep(0.7)
-                resp = dict(servers=servers, status=200)
-            return dict(status=200, text=json.dumps(resp))
+                resp = dict(servers=servers, slb_id=slb_id, status=200, text="ok")
+            return resp
         except Exception as e:
-            print(f"err {e}")
-            return dict(status=500, text=str(e))
+            print(f"对SLB{slb_id}服务器{option.ecs_id}操作{option.action}出错： {e}")
+            return dict(servers=[], slb_id=slb_id, status=500, text=str(e))
 
 
 class ClassicAgent(object):

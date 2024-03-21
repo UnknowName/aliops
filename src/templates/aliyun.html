@@ -103,11 +103,20 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
       url: `slb/change?ecsId=${ecsId}&slbId=${slbId}&action=${action}&virtual_id=${virtual_id}&port=${port}`,
       dataType: "json",
     }).always(function (response) {
-        if (response.status == undefined) {
-            var servers = response.BackendServers.BackendServer;
-            // servers.sort(sortByName);
-            console.log(`servers=${servers}`);
-            for(var i=0;i<servers.length;i++) {
+        var slbs=[];
+        var change_servers = new Set();
+        var weight = "";
+        for (var i = 0; i < response.length; i++) {
+            resp = response[i];
+            if (resp.status != 200) {
+                alert(`调整失败，请重试，原因: ${resp.text}`);
+                return
+            }
+            slbs.push(resp.slb_id);
+        }
+        for (var i = 0; i < response.length; i++) {
+            var servers = resp.servers;
+            for(var i=0; i<servers.length; i++) {
                 server = servers[i];
                 if (server.ServerId == ecsId) {
                     var serverId = "#" + server.ServerId;
@@ -119,34 +128,13 @@ function changeServerStatus(ecsId, slbId, action, virtual_id, port) {
                         serverObject.css("color", "green");
                         var newHtml = serverObject.html().replace("已下线", "上线中");
                     };
-                    alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
+                    weight = server.Weight;
+                    change_servers.add(server.ServerId);
                     serverObject.html(newHtml);
                 };
             };
-        } else if (response.status == 200 ) {
-            var servers = response.servers;
-            // servers.sort(sortByName);
-            for (var i = 0; i < servers.length;i++) {
-                var server = servers[i];
-                if (server.ServerId == ecsId){
-                    var serverId = "#" + server.ServerId;
-                    serverObject = $(serverId);
-                    if (action == "offline") {
-                        serverObject.css("color", "red");
-                        var newHtml = serverObject.html().replace("上线中", "已下线");
-                    }else{
-                        serverObject.css("color", "green");
-                        var newHtml = serverObject.html().replace("已下线", "上线中");
-                    };
-                    alert(`成功将服务器${server.ServerId}的权重设置为${server.Weight}`);
-                    serverObject.html(newHtml);
-                };
-            }
-        } else if (response.status == 403) {
-            alert(`当前只有一台主机在线，不允许执行下线操作`);
-        } else {
-            alert("设置失败，请重试或者联系管理员");
-        };
+       }
+       alert(`设置成功，负载: ${slbs}, 服务器: ${Array.from(change_servers.values())}: 权重: ${weight}`);
     });
 };
 

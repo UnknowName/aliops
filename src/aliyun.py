@@ -1,16 +1,17 @@
 import pprint
 import time
-import asyncio
+from typing import List, Dict
+import concurrent.futures
 
+import asyncio
 import aiohttp_jinja2
 from aiohttp import web
 from alibabacloud_tea_openapi import models as open_api_models
 from alibabacloud_cdn20180510 import models as cdn_20180510_models
 from alibabacloud_cdn20180510.client import Client as Cdn20180510Client
 
-
 import manager
-from config import AppConfig
+from config import AppConfig, DomainConfig
 
 config = AppConfig()
 
@@ -55,7 +56,7 @@ async def slb_index(request):
     if request.method == "GET":
         responses = list()
         for domain, conf in config.domain.items():
-            if conf.slb:
+            if conf.slb and not conf.invisible:
                 responses.append({domain: conf.slb.ids})
         return dict(domains=responses)
     return {}
@@ -80,7 +81,9 @@ async def change_slb_backend(request):
     action = request.query.get("action")
     port = request.query.get("port")
     domain_conf = config.get_domain_config(domain)
-    slb_agent = manager.get_slb(domain_conf.slb.type, config.slb_api.key, config.slb_api.secret, config.slb_api.region)
+    confs = [domain_conf]
+    if domain_conf.relatives:
+        confs += [config.get_domain_config(other) for other in domain_conf.relatives]
     virtual_name = domain_conf.slb.backend_virtual_name
     option = manager.OperatorOption(
         slb_id=slb_id,
@@ -90,16 +93,9 @@ async def change_slb_backend(request):
         virtual_name=virtual_name,
         port=port,
     )
-    # 检查当前负载是否再下线后没有机器了
-    print("对SLB{}服务器{}执行{}操作".format(slb_id, option.ecs_id, option.action))
-    if option.action == "offline":
-        backend_resp = slb_agent.get_backends(slb_id, option.virtual_name)
-        backends = backend_resp.get("servers")
-        actives = list(server for server in backends if server.get("weight") != 0)
-        if len(actives) == 1:
-            return web.Response(status=403, text="当前只有一台主机在线")
-    resp = slb_agent.change_backend(slb_id, option)
-    return web.Response(status=200, text=resp.get("text"))
+    print(f"{domain}的对服务器{ecs_id}执行{action}操作")
+    res = change_slbs_backend(confs, option)
+    return web.json_response(res)
 
 
 @aiohttp_jinja2.template("dns.html")
@@ -154,3 +150,60 @@ async def slb_add_ip(request):
         agent = manager.ACLAgent(config.slb_api.key, config.slb_api.secret, config.slb_api.region)
         resp = agent.add_ip(ip, comment)
         return web.json_response(resp)
+
+
+# use for internal
+def get_slbs_backends(confs: List[DomainConfig]) -> Dict:
+    conf_and_agent = {
+        conf: manager.get_slb(conf.slb.type, config.slb_api.key, config.slb_api.secret, config.slb_api.region)
+        for conf in confs
+    }
+    result = dict()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(confs)) as pool:
+        tasks = {
+            pool.submit(agent.get_backends,
+                        slb_id=list(conf.slb.ids.keys())[0],
+                        virtual_name=conf.slb.backend_virtual_name): conf
+            for conf, agent in conf_and_agent.items()
+        }
+        for task in concurrent.futures.as_completed(tasks):
+            conf = tasks[task]
+            servers = task.result().get("servers")
+            result[conf] = servers
+    return result
+
+
+def change_slbs_backend(confs: List[DomainConfig], option: manager.OperatorOption) -> List:
+    conf_and_servers = get_slbs_backends(confs)
+    for conf, servers in conf_and_servers.items():
+        actives = {server.get("id"): None for server in servers if server.get("weight", 0) > 0}
+        if len(actives) == 1 and option.action == "offline" and option.ecs_id in actives:
+            return [dict(status=403, servers=[], text="当前主机下线后无可用主机")]
+    conf_and_agent = {
+        conf: manager.get_slb(conf.slb.type, config.slb_api.key, config.slb_api.secret, config.slb_api.region)
+        for conf in confs
+    }
+    res = list()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(confs)) as pool:
+        tasks = [
+            pool.submit(
+                agent.change_backend,
+                slb_id=list(conf.slb.ids.keys())[0],
+                option=manager.OperatorOption(
+                    slb_id=list(conf.slb.ids.keys())[0],
+                    ecs_id=option.ecs_id,
+                    virtual_name=conf.slb.backend_virtual_name,
+                    virtual_id=conf_and_servers[conf][0].get("virtual_id"),
+                    action=option.action,
+                    port=option.port
+                )
+            )
+            for conf, agent in conf_and_agent.items()
+        ]
+        for task in concurrent.futures.as_completed(tasks):
+            res.append(task.result())
+    return res
+
+
+if __name__ == '__main__':
+  pass

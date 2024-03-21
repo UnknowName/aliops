@@ -1,6 +1,9 @@
 domains:
   - display: ops.sissyun.com.cn_test
     domain: sissyun.com.cn
+    # 与之相关的，即修改这个，会同时修改它的relatives,需要后端服务器的ID+端口相一致，用于一组机器承载多个负载均衡
+    relatives:
+      - finance-internal
     slb:
       # if not present,Use default backends
       backend_virtual_name: graylog #bank-consumer
@@ -13,6 +16,8 @@ domains:
     - 39.108.27.240
 
   - display: finance-internal
+    # if it is true,don't display on page
+    invisible: true
     slb:
       type: nlb
       backend_virtual_name: test

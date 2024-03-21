@@ -1,5 +1,5 @@
 import yaml
-from typing import Dict
+from typing import Dict, List
 
 CONFIG_FILE = "config.yml"
 
@@ -24,6 +24,9 @@ class SLBConfig(object):
         self.backend_virtual_name = data.get("backend_virtual_name")
         self.ids = {k: None for k in data.get("ids", [])}
 
+    def __repr__(self) -> str:
+        return f"SLBConfig(type={self.type} ids={self.ids}, backend={self.backend_virtual_name})"
+
 
 class NGINXConfig(object):
     def __init__(self, data: dict):
@@ -40,6 +43,8 @@ class DomainConfig(object):
         self.ip: dict = {ip: None for ip in data.get("ips", [])}
         self.nginx: NGINXConfig = NGINXConfig(data.get("nginx")) if data.get("nginx") else None
         self.slb: SLBConfig = SLBConfig(data.get("slb")) if data.get("slb") else None
+        self.invisible = data.get("invisible", False)
+        self.relatives: List[str] = data.get("relatives", [])
 
 
 class AppConfig(object):
