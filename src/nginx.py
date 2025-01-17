@@ -17,12 +17,11 @@ async def get_domain_attrs(request):
     domain = data.get("domain", "")
     domain_conf = config.get_domain_config(domain)
     nginx_user, nginxs = domain_conf.nginx.ssh_user, domain_conf.nginx.hosts
-    if not nginxs:
-        nginxs = config.nginx.hosts
-    if not nginx_user:
-        nginx_user = config.nginx.ssh_user
     config_file = domain_conf.nginx.config_file
     backend_port = domain_conf.nginx.backend_port
+    if not nginxs or not nginx_user or not config_file:
+        response = dict(servres=[], status="500", err_msg=f"{domain}配置有误，请联系管理员")
+        return web.json_response(response)
     if backend_port == "":
         response = dict(servres=[], status="500", err_msg="当前域名后端端口配置有误，请联系管理员")
         return web.json_response(response)
@@ -63,6 +62,9 @@ async def change_upstream(request):
         domain_conf = config.get_domain_config(domain)
         nginx_user, nginxs = domain_conf.nginx.ssh_user, domain_conf.nginx.hosts
         config_file = domain_conf.nginx.config_file
+        if not nginxs or not nginx_user or not config_file:
+            response = dict(servres=[], status="500", err_msg=f"{domain}配置有误，请联系管理员")
+            return web.json_response(response)
         if not config_file:
             logger.error("{} Domain NGINX config file path not set!".format(domain))
             return web.json_response(status=500, data=dict(status=500, msg="配置文件有误或者未配置当前域名,请联系管理员修正"))

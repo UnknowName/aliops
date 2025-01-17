@@ -72,5 +72,16 @@ class AppConfig(object):
         return self.slb_api
 
     def get_domain_config(self, display: str) -> DomainConfig:
-        return self.domain[display]
+        v = self.domain.get(display, None)
+        if not v:
+            raise Exception(f"{display} config error")
+        if not v.nginx:
+            v.nginx = self.nginx
+        if not v.nginx.hosts:
+            v.nginx.hosts = self.nginx.hosts
+        if not v.nginx.ssh_user:
+            v.nginx.ssh_user = self.nginx.ssh_user
+        if not v.nginx.config_file:
+            v.nginx.config_file = self.nginx.config_file
+        return v
 

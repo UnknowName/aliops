@@ -1,4 +1,4 @@
-FROM python:3.8-alpine
+FROM docker.1ms.run/python:3.8-alpine
 ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1 \
     TZ=Asia/Shanghai
 ADD ./src /opt/app
