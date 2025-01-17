@@ -17,6 +17,10 @@ async def get_domain_attrs(request):
     domain = data.get("domain", "")
     domain_conf = config.get_domain_config(domain)
     nginx_user, nginxs = domain_conf.nginx.ssh_user, domain_conf.nginx.hosts
+    if not nginxs:
+        nginxs = config.nginx.hosts
+    if not nginx_user:
+        nginx_user = config.nginx.ssh_user
     config_file = domain_conf.nginx.config_file
     backend_port = domain_conf.nginx.backend_port
     if backend_port == "":
@@ -26,6 +30,9 @@ async def get_domain_attrs(request):
         GatewayNGINX(nginx_user, host).get_servers(config_file, str(backend_port))
         for host in nginxs
     ]
+    if len(all_servers) == 0:
+        response = dict(servres=[], status="501", err_msg="获取后端服务器为0，请联系管理员")
+        return web.json_response(response)
     if not check_equal(all_servers):
         # 网关数据不一样，有可能是因为主机连接失败，打印到终端用于DEBUG
         logger.info("执行获取{0}网关数据，数据不一致: {1}".format(domain, all_servers))
